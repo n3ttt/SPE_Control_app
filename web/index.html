@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f1216">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SPE Control">
 <title>Expert 1.5K-FA Control Panel</title>
 <style>
   :root{
@@ -107,6 +111,8 @@
   .overlay h3{margin:0 0 10px}
   .overlay p{color:var(--muted);line-height:1.5}
   .hidden{display:none!important}
+  .server-mode .local-only, .server-mode #welcome{display:none!important}
+  @media (max-width:600px){ header{padding:10px 12px} main{padding:10px;gap:10px} .opbtn{flex:1 1 100%} .txbox{flex:1 1 40%} .keys{grid-template-columns:repeat(3,1fr)} }
   .disabled-ui{opacity:.45;pointer-events:none}
 </style>
 </head>
@@ -115,12 +121,13 @@
   <h1>Expert 1.5K-FA Control</h1>
   <span class="pill"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></span>
   <span class="pill" id="modelPill" title="Model reported by the amplifier">Model: —</span>
+  <span class="pill hidden" id="lanPill" title="Type this into the browser on a phone or tablet on the same Wi-Fi">📱 Phones &amp; tablets: <b id="lanUrl" style="color:var(--text);user-select:all"></b></span>
   <span class="sp"></span>
-  <label class="pill" title="USB is normally 115200">Baud
+  <label class="pill local-only" title="USB is normally 115200">Baud
     <select id="baud"><option>115200</option><option>57600</option><option>38400</option><option>19200</option><option>9600</option></select>
   </label>
-  <button id="btnDemo">Demo mode</button>
-  <button id="btnConnect" class="primary">Connect amplifier</button>
+  <button id="btnDemo" class="local-only">Demo mode</button>
+  <button id="btnConnect" class="primary local-only">Connect amplifier</button>
 </header>
 
 <main id="ui" class="disabled-ui">
@@ -347,6 +354,28 @@ class SerialLink {
   }
 }
 
+/* Used when the page is served by the SPE Control app: the app owns the USB port. */
+class ServerLink {
+  constructor(onFrame,onInfo){ this.onFrame=onFrame; this.onInfo=onInfo; }
+  async open(){ this.alive=true; this.loop(); }
+  async loop(){
+    while(this.alive){
+      try{
+        const r=await fetch("/api/status",{cache:"no-store"});
+        const j=await r.json();
+        this.onInfo(j);
+        if(j.frame && j.age<3) this.onFrame(j.frame);
+      }catch(e){ this.onInfo(null); }
+      await new Promise(r=>setTimeout(r,250));
+    }
+  }
+  async send(c){
+    if(c===CMD.STATUS) return;               // the app polls the amp itself
+    await fetch("/api/cmd?c="+c,{method:"POST"});
+  }
+  async close(){ this.alive=false; }
+}
+
 class DemoLink {
   constructor(onFrame){ this.onFrame=onFrame;
     this.s={op:false,tx:false,bank:"A",input:"1",band:5,ant:1,atu:true,level:"M",temp:31,txUntil:0,nextTx:Date.now()+2500,tuneUntil:0};
@@ -415,6 +444,7 @@ async function start(l, label, kind){
   link=l; st=null; noReplyWarned=false; lastFrameAt=Date.now();
   setConn(kind,label); $("welcome").classList.add("hidden");
   log(label);
+  if(l instanceof ServerLink){ await l.open(); return; }
   pollTimer=setInterval(async()=>{
     try{ await link.send(CMD.STATUS); }catch(e){ log("Write failed: "+e.message,true); stop(); return; }
     if (!noReplyWarned && Date.now()-lastFrameAt>4000){
@@ -501,7 +531,7 @@ function render(){
   $("bandText").textContent=bandName(s.band);
   $("modelPill").textContent="Model: "+s.id;
   $("inText").textContent="Input "+s.input;
-  $("bankText").textContent="· Bank "+s.bank;
+  $("bankText").textContent="Bank "+s.bank;
   document.querySelectorAll("#lvlSeg button").forEach(b=>{ b.classList.toggle("sel",b.dataset.l===s.level); });
   // Power gauge
   const max = 1500;
@@ -509,7 +539,8 @@ function render(){
   $("pwrVal").textContent=s.pout;
   $("peakVal").textContent=peak;
   const pct=Math.min(100,s.pout/max*100);
-  $("pwrArc").setAttribute("stroke-dasharray",`${pct} 100`);
+  $("pwrArc").setAttribute("stroke-dasharray",`${pct} 200`);
+  $("pwrArc").style.opacity = pct>0 ? 1 : 0;
   $("pwrArc").setAttribute("stroke", s.pout>max*0.97?"var(--bad)":"var(--accent)");
   $("peakTick").setAttribute("transform",`rotate(${-90+Math.min(180,peak/max*180)} 110 115)`);
   // SWR
@@ -582,6 +613,29 @@ $("wConnect").onclick=connectSerial;
 const demo=()=>start(new DemoLink(onFrame),"Demo mode (simulated amp)","demo");
 $("btnDemo").onclick=demo; $("wDemo").onclick=demo;
 const sb=localStorage.getItem("expBaud"); if(sb) $("baud").value=sb;
+
+/* Server mode: when this page is opened from the SPE Control app, connect automatically. */
+let lastServerState="";
+function onServerInfo(j){
+  if(!j){ setConn(null,"Lost contact with the SPE Control computer"); $("ui").classList.add("disabled-ui"); return; }
+  const live = j.frame && j.age<3;
+  $("connDot").className="dot"+(live?" on":"");
+  $("connText").textContent = live ? "Amplifier connected" : j.state;
+  $("ui").classList.toggle("disabled-ui",!live);
+  if(j.state!==lastServerState){ lastServerState=j.state; log(j.state, !live); }
+  const here = location.hostname==="localhost"||location.hostname==="127.0.0.1";
+  if(here && j.urls && j.urls.length){ $("lanPill").classList.remove("hidden"); $("lanUrl").textContent=j.urls[0].replace(/\/$/,""); }
+}
+(async()=>{
+  if(!location.protocol.startsWith("http")) return;
+  try{
+    const r=await fetch("/api/status",{cache:"no-store"}); const j=await r.json();
+    if(!j.server) return;
+    document.body.classList.add("server-mode");
+    start(new ServerLink(onFrame,onServerInfo),"Using SPE Control on "+location.host,"on");
+    $("ui").classList.add("disabled-ui");
+  }catch(e){}
+})();
 
 document.addEventListener("keydown",e=>{
   if(!link || !st || e.ctrlKey || e.altKey || e.target.tagName==="SELECT") return;
