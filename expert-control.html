@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Expert 1.5K-FA Control Panel</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171b21; --panel2:#1e232b; --line:#2a313b; --text:#e6e9ee; --muted:#8b95a3;
+    --accent:#3aa0ff; --ok:#2fc46b; --warn:#f2b233; --bad:#ef4b4b; --tx:#ff5a4f;
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-size:15px}
+  header{display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.2px}
+  header .sp{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#555}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .dot.demo{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;transition:background .12s,border-color .12s}
+  button:hover:not(:disabled){border-color:#4a5563;background:#252b34}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#04121f;font-weight:600}
+  button.primary:hover:not(:disabled){background:#5bb2ff}
+  button.danger{border-color:#5b2a2a;color:#ff8a8a}
+  select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 8px}
+  main{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;padding:16px 20px;max-width:1400px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 0 12px;font-weight:600}
+  .c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
+  @media (max-width:1000px){.c3,.c4,.c5,.c6,.c7,.c8{grid-column:span 12}}
+
+  /* Status strip */
+  .strip{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+  .opbtn{flex:0 0 220px;border-radius:12px;padding:14px;text-align:left;border-width:2px}
+  .opbtn .big{font-size:26px;font-weight:700;display:block}
+  .opbtn .sub{font-size:12px;color:var(--muted)}
+  .opbtn.operate{border-color:var(--ok);background:rgba(47,196,107,.12)}
+  .opbtn.operate .big{color:var(--ok)}
+  .opbtn.standby .big{color:var(--warn)}
+  .txbox{flex:0 0 130px;border-radius:12px;border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--panel2)}
+  .txbox .big{font-size:30px;font-weight:800;letter-spacing:2px;color:#3b434e}
+  .txbox.tx{border-color:var(--tx);background:rgba(255,90,79,.15)}
+  .txbox.tx .big{color:var(--tx);text-shadow:0 0 14px rgba(255,90,79,.6)}
+  .txbox .sub{font-size:12px;color:var(--muted)}
+  .kv{flex:1;min-width:120px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .kv .k{font-size:12px;color:var(--muted)}
+  .kv .v{font-size:24px;font-weight:600;margin-top:2px}
+  .seg{display:flex;gap:6px;margin-top:6px}
+  .seg button{flex:1;padding:8px 0;font-weight:600}
+  .seg button.sel{background:var(--accent);border-color:var(--accent);color:#04121f}
+
+  /* Gauges */
+  .gauge{position:relative;text-align:center}
+  .gauge svg{width:100%;max-width:340px}
+  .gauge .val{position:absolute;left:0;right:0;top:52%;font-size:42px;font-weight:700}
+  .gauge .val small{font-size:16px;color:var(--muted);font-weight:500}
+  .gauge .peak{color:var(--muted);font-size:13px;margin-top:-6px}
+  .meter{margin:10px 0 16px}
+  .meter .row{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:5px}
+  .meter .row b{color:var(--text);font-size:18px}
+  .bar{height:12px;background:var(--panel2);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  .bar > i{display:block;height:100%;width:0;border-radius:6px;transition:width .2s,background .2s}
+  .ticks{display:flex;justify-content:space-between;font-size:11px;color:#5d6673;margin-top:3px}
+  .mini{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .mini .kv .v{font-size:20px}
+
+  /* Bands */
+  .bands{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .bands button{padding:14px 0;font-size:17px;font-weight:600}
+  .bands button.sel{background:var(--accent);border-color:var(--accent);color:#04121f}
+  .bands button.pending{border-color:var(--accent);animation:pulse 1s infinite}
+  @keyframes pulse{50%{background:rgba(58,160,255,.25)}}
+  .hint{font-size:12px;color:var(--muted);margin-top:10px}
+
+  .ant{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .actions{display:flex;flex-wrap:wrap;gap:8px}
+  .actions button{flex:1;min-width:110px}
+
+  /* Alerts */
+  .alerts{display:flex;flex-direction:column;gap:8px}
+  .alert{padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);display:flex;gap:10px}
+  .alert .ic{font-size:18px;line-height:1}
+  .alert b{display:block}
+  .alert span{font-size:13px;color:var(--muted)}
+  .alert.w{border-color:#6b5320;background:rgba(242,178,51,.08)}
+  .alert.a{border-color:#6b2626;background:rgba(239,75,75,.12)}
+  .alert.ok{border-color:#1f5536;background:rgba(47,196,107,.07)}
+
+  canvas{width:100%;height:170px;display:block}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{display:inline-block;width:10px;height:3px;vertical-align:middle;margin-right:5px}
+
+  .log{font-family:Consolas,monospace;font-size:12.5px;max-height:190px;overflow:auto;color:#b9c1cc}
+  .log div{padding:2px 0;border-bottom:1px dashed #222830}
+  .log .t{color:#5d6673;margin-right:8px}
+
+  details summary{cursor:pointer;color:var(--muted);font-size:13px;user-select:none}
+  .keys{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
+  .raw{font-family:Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-all;margin-top:10px}
+  kbd{background:#262c35;border:1px solid #3a424e;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px;font-family:inherit}
+
+  .overlay{position:fixed;inset:0;background:rgba(5,7,10,.72);display:flex;align-items:center;justify-content:center;z-index:10}
+  .overlay .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;max-width:520px}
+  .overlay h3{margin:0 0 10px}
+  .overlay p{color:var(--muted);line-height:1.5}
+  .hidden{display:none!important}
+  .disabled-ui{opacity:.45;pointer-events:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Expert 1.5K-FA Control</h1>
+  <span class="pill"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></span>
+  <span class="pill" id="modelPill" title="Model reported by the amplifier">Model: —</span>
+  <span class="sp"></span>
+  <label class="pill" title="USB is normally 115200">Baud
+    <select id="baud"><option>115200</option><option>57600</option><option>38400</option><option>19200</option><option>9600</option></select>
+  </label>
+  <button id="btnDemo">Demo mode</button>
+  <button id="btnConnect" class="primary">Connect amplifier</button>
+</header>
+
+<main id="ui" class="disabled-ui">
+  <!-- Status strip -->
+  <section class="card c12">
+    <div class="strip">
+      <button class="opbtn standby" id="opBtn" title="Toggle Operate / Standby  (O)">
+        <span class="sub">Mode — click to toggle</span>
+        <span class="big" id="opText">STANDBY</span>
+        <span class="sub" id="opHint">Amplifier bypassed, exciter goes straight through</span>
+      </button>
+      <div class="txbox" id="txBox"><span class="big">TX</span><span class="sub" id="txSub">Receiving</span></div>
+      <div class="kv"><div class="k">Band</div><div class="v" id="bandText">—</div></div>
+      <div class="kv"><div class="k">Power level <kbd>P</kbd></div>
+        <div class="seg" id="lvlSeg">
+          <button data-l="L" title="Low">LOW</button><button data-l="M" title="Mid">MID</button><button data-l="H" title="High">HIGH</button>
+        </div>
+      </div>
+      <div class="kv"><div class="k">Input / Memory</div><div class="v"><span id="inText">—</span> <span style="color:var(--muted);font-size:16px" id="bankText"></span></div></div>
+    </div>
+  </section>
+
+  <!-- Output power -->
+  <section class="card c4">
+    <h2>Output power</h2>
+    <div class="gauge">
+      <svg viewBox="0 0 220 130">
+        <path d="M20 115 A90 90 0 0 1 200 115" fill="none" stroke="#262c35" stroke-width="16" stroke-linecap="round" pathLength="100"/>
+        <path id="pwrArc" d="M20 115 A90 90 0 0 1 200 115" fill="none" stroke="var(--accent)" stroke-width="16" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+        <line id="peakTick" x1="110" y1="16" x2="110" y2="36" stroke="#fff" stroke-width="3" transform="rotate(-90 110 115)" opacity=".8"/>
+        <text x="20" y="128" fill="#5d6673" font-size="9" text-anchor="middle">0</text>
+        <text x="200" y="128" fill="#5d6673" font-size="9" text-anchor="middle" id="pwrMaxLbl">1500</text>
+      </svg>
+      <div class="val"><span id="pwrVal">0</span><small> W</small></div>
+      <div class="peak">Peak (3 s hold): <span id="peakVal">0</span> W</div>
+    </div>
+  </section>
+
+  <!-- SWR & PA -->
+  <section class="card c4">
+    <h2>SWR &amp; amplifier</h2>
+    <div class="meter">
+      <div class="row"><span>SWR at antenna</span><b id="swrAntVal">—</b></div>
+      <div class="bar"><i id="swrAntBar"></i></div>
+      <div class="ticks"><span>1.0</span><span>1.5</span><span>2.0</span><span>2.5</span><span>3.0+</span></div>
+    </div>
+    <div class="meter">
+      <div class="row"><span>SWR at ATU (what the amp sees)</span><b id="swrAtuVal">—</b></div>
+      <div class="bar"><i id="swrAtuBar"></i></div>
+    </div>
+    <div class="mini">
+      <div class="kv"><div class="k">PA voltage</div><div class="v" id="vpaVal">—</div></div>
+      <div class="kv"><div class="k">PA current</div><div class="v" id="ipaVal">—</div></div>
+    </div>
+  </section>
+
+  <!-- Temperature + alerts -->
+  <section class="card c4">
+    <h2>Temperature</h2>
+    <div class="meter">
+      <div class="row"><span>Heatsink</span><b id="tempVal">—</b></div>
+      <div class="bar"><i id="tempBar"></i></div>
+      <div class="ticks"><span>20°</span><span>40°</span><span>60°</span><span>80°</span></div>
+    </div>
+    <div class="mini" id="tempExtra"></div>
+    <h2 style="margin-top:16px">Health</h2>
+    <div class="alerts" id="alerts"><div class="alert ok"><span class="ic">✓</span><div><b>No warnings</b><span>Everything looks normal.</span></div></div></div>
+  </section>
+
+  <!-- Bands -->
+  <section class="card c5">
+    <h2>Band — click to jump straight there</h2>
+    <div class="bands" id="bands"></div>
+    <div class="hint">The amp only has Band&nbsp;+/− keys, so this panel presses them for you until it lands on the band you picked. Disabled while transmitting. <kbd>←</kbd> <kbd>→</kbd> step one band.</div>
+  </section>
+
+  <!-- Antenna / ATU -->
+  <section class="card c3">
+    <h2>Antenna &amp; tuner</h2>
+    <div class="ant">
+      <div class="kv"><div class="k">TX antenna</div><div class="v" id="txAntVal">—</div></div>
+      <div class="kv"><div class="k">RX antenna</div><div class="v" id="rxAntVal">—</div></div>
+    </div>
+    <div class="kv" style="margin-bottom:12px"><div class="k">Tuner (ATU)</div><div class="v" id="atuVal" style="font-size:18px">—</div></div>
+    <div class="actions">
+      <button id="btnAnt" title="Next antenna (A)">Next antenna</button>
+      <button id="btnTune" title="Start ATU tune (T) — key a carrier first">Tune ATU</button>
+      <button id="btnInput" title="Switch input 1/2 (I)">Swap input</button>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section class="card c4">
+    <h2>Last 2 minutes</h2>
+    <canvas id="hist" width="600" height="170"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Power (W)</span><span><i style="background:var(--warn)"></i>SWR</span><span><i style="background:#c37bff"></i>Temp</span></div>
+  </section>
+
+  <!-- Log -->
+  <section class="card c6">
+    <h2>Event log</h2>
+    <div class="log" id="log"></div>
+  </section>
+
+  <!-- Advanced -->
+  <section class="card c6">
+    <h2>Advanced</h2>
+    <details>
+      <summary>Front-panel keys, raw data and power off</summary>
+      <div class="keys">
+        <button data-k="L_DN">L −</button><button data-k="L_UP">L +</button>
+        <button data-k="C_DN">C −</button><button data-k="C_UP">C +</button>
+        <button data-k="LEFT">◀</button><button data-k="RIGHT">▶</button>
+        <button data-k="SET">SET</button><button data-k="DISPLAY">DISPLAY</button>
+        <button data-k="CAT">CAT</button><button data-k="BAND_DN">BAND −</button>
+        <button data-k="BAND_UP">BAND +</button><button id="btnOff" class="danger">Power OFF</button>
+      </div>
+      <div class="raw">Last status frame: <span id="raw">—</span></div>
+      <div class="hint">Shortcuts: <kbd>O</kbd> operate/standby · <kbd>P</kbd> power level · <kbd>A</kbd> antenna · <kbd>T</kbd> tune · <kbd>I</kbd> input · <kbd>←</kbd>/<kbd>→</kbd> band</div>
+    </details>
+  </section>
+</main>
+
+<div class="overlay" id="welcome">
+  <div class="box">
+    <h3>Connect your Expert 1.5K-FA</h3>
+    <p>Plug the amplifier in by USB and click <b>Connect amplifier</b>, then choose its COM port (usually “USB Serial Port”). This page needs Chrome or Edge.</p>
+    <p>Want to look around first? <b>Demo mode</b> runs a simulated amplifier.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button id="wDemo">Try demo</button><button id="wConnect" class="primary">Connect amplifier</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- Protocol (SPE Expert serial/USB) ---------- */
+const CMD = {INPUT:0x01,BAND_DN:0x02,BAND_UP:0x03,ANT:0x04,L_DN:0x05,L_UP:0x06,C_DN:0x07,C_UP:0x08,
+  TUNE:0x09,OFF:0x0A,POWER:0x0B,DISPLAY:0x0C,OPERATE:0x0D,CAT:0x0E,LEFT:0x0F,RIGHT:0x10,SET:0x11,STATUS:0x90};
+const packet = c => new Uint8Array([0x55,0x55,0x55,0x01,c,c]);
+
+const BANDS = [["00","160m"],["01","80m"],["02","60m"],["03","40m"],["04","30m"],["05","20m"],["06","17m"],["07","15m"],["08","12m"],["09","10m"],["10","6m"]];
+const bandIdx = code => BANDS.findIndex(b => b[0] === code);
+
+const WARN = {
+  M:["Amplifier alarm","Check the alarm details on the amplifier."],
+  A:["No antenna selected","Pick an antenna for this band in the amp's setup."],
+  S:["High SWR at antenna","Check the antenna and feedline, or run the tuner."],
+  B:["No valid band","The exciter frequency isn't in a ham band the amp knows."],
+  P:["Power limit exceeded","Reduce drive from the exciter."],
+  O:["Running hot","Let the amp cool or reduce duty cycle."],
+  Y:["Tuner not available","The ATU can't be used on this band/antenna."],
+  W:["Tuning with no power","Key a low-power carrier before pressing Tune."],
+  K:["Tuner bypassed","The ATU is switched out of line."],
+  R:["Power switch held by remote","The amp is being held on by remote control."],
+  T:["Combiner overheating","Reduce power or let the amp cool."],
+  C:["Combiner fault","Check the amplifier."]
+};
+const ALARM = {
+  S:["SWR beyond limits","Transmission stopped to protect the amp. Fix the antenna match."],
+  A:["Amplifier protection tripped","The amp protected itself. Check drive and SWR."],
+  D:["Input overdrive","Turn the exciter power down."],
+  H:["Excessive temperature","The amp is too hot. Let it cool."],
+  C:["Combiner fault","Check the amplifier."]
+};
+
+function parseStatus(text){
+  let f = text.split(",").map(s => s.trim());
+  const i = f.findIndex(x => /^\d{2}K$/i.test(x));
+  if (i < 0) return null;
+  f = f.slice(i);
+  const n = (x, d=0) => { const v = parseFloat(x); return isNaN(v) ? d : v; };
+  const letters = f.slice(17).filter(x => /^[A-Z]$/.test(x));
+  return {
+    id:f[0], operate:f[1]==="O", tx:f[2]==="T", bank:f[3], input:f[4], band:f[5],
+    txAnt:f[6]||"", rxAnt:f[7]||"", level:f[8], pout:n(f[9]), swrAtu:n(f[10]), swrAnt:n(f[11]),
+    vpa:n(f[12]), ipa:n(f[13]), tUp:n(f[14]), tLow:n(f[15]), tComb:n(f[16]),
+    warn:letters[0]||"N", alarm:letters[1]||"N", raw:text
+  };
+}
+
+/* ---------- Transports ---------- */
+class SerialLink {
+  constructor(onFrame,onClose){ this.onFrame=onFrame; this.onClose=onClose; this.buf=[]; }
+  async open(baud){
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({baudRate:baud, dataBits:8, stopBits:1, parity:"none", flowControl:"none"});
+    this.writer = this.port.writable.getWriter();
+    this.alive = true; this.readLoop();
+  }
+  async readLoop(){
+    while (this.alive && this.port.readable){
+      this.reader = this.port.readable.getReader();
+      try{
+        for(;;){ const {value,done} = await this.reader.read(); if(done) break; this.feed(value); }
+      }catch(e){ log("Serial read error: "+e.message, true); }
+      finally{ this.reader.releaseLock(); }
+      if (!this.alive) break;
+      break;
+    }
+    if (this.alive){ this.alive=false; this.onClose(); }
+  }
+  feed(bytes){
+    for (const b of bytes) this.buf.push(b);
+    for(;;){
+      let s = -1;
+      for (let i=0;i+2<this.buf.length;i++) if (this.buf[i]===0xAA&&this.buf[i+1]===0xAA&&this.buf[i+2]===0xAA){s=i;break;}
+      if (s<0){ if(this.buf.length>512) this.buf=this.buf.slice(-2); return; }
+      if (this.buf.length < s+4) return;
+      const len = this.buf[s+3];
+      if (this.buf.length < s+4+len+2) return;
+      const payload = this.buf.slice(s+4, s+4+len);
+      this.buf = this.buf.slice(s+4+len+2);
+      while (this.buf[0]===0x0D||this.buf[0]===0x0A) this.buf.shift();
+      this.onFrame(String.fromCharCode(...payload));
+    }
+  }
+  async send(c){ if (this.writer) await this.writer.write(packet(c)); }
+  async close(){
+    this.alive=false;
+    try{ await this.reader?.cancel(); }catch{}
+    try{ this.writer?.releaseLock(); }catch{}
+    try{ await this.port?.close(); }catch{}
+  }
+}
+
+class DemoLink {
+  constructor(onFrame){ this.onFrame=onFrame;
+    this.s={op:false,tx:false,bank:"A",input:"1",band:5,ant:1,atu:true,level:"M",temp:31,txUntil:0,nextTx:Date.now()+2500,tuneUntil:0};
+  }
+  async open(){}
+  async close(){ clearTimeout(this.t); }
+  async send(c){
+    const s=this.s;
+    switch(c){
+      case CMD.OPERATE: s.op=!s.op; break;
+      case CMD.BAND_UP: if(!s.tx) s.band=Math.min(BANDS.length-1,s.band+1); break;
+      case CMD.BAND_DN: if(!s.tx) s.band=Math.max(0,s.band-1); break;
+      case CMD.POWER: s.level={L:"M",M:"H",H:"L"}[s.level]; break;
+      case CMD.ANT: s.ant = s.ant%4+1; break;
+      case CMD.INPUT: s.input = s.input==="1"?"2":"1"; break;
+      case CMD.TUNE: s.tuneUntil=Date.now()+2500; s.atu=true; break;
+      case CMD.OFF: log("Demo: amplifier would switch off now."); break;
+      case CMD.STATUS: this.t=setTimeout(()=>this.onFrame(this.frame()),15); break;
+    }
+  }
+  frame(){
+    const s=this.s, now=Date.now();
+    if (!s.tx && now>s.nextTx){ s.tx=true; s.txUntil=now+1500+Math.random()*4000; }
+    if (s.tx && now>s.txUntil){ s.tx=false; s.nextTx=now+1500+Math.random()*4500; }
+    const tx = s.tx && s.op;
+    const max={L:500,M:1000,H:1450}[s.level];
+    const pout = tx ? Math.round(max*(0.55+0.45*Math.abs(Math.sin(now/180)))*(0.9+Math.random()*0.1)) : 0;
+    const baseSwr = [1.9,1.3,1.6,1.15,1.4,1.2,1.35,1.25,1.5,1.3,1.7][s.band]*(s.ant===1?1:1.2);
+    const swrAnt = s.tx ? baseSwr+Math.random()*0.04 : 0;
+    const swrAtu = s.tx ? (s.atu?1.05+Math.random()*0.04:swrAnt) : 0;
+    s.temp += tx ? pout/9000 : -(s.temp-31)/60;
+    const warn = s.band===0 && s.tx ? "S" : (s.temp>58?"O":"N");
+    const f2=(v,w,d)=>v.toFixed(d).padStart(w,"0");
+    return ","+["15K",s.op?"O":"S",s.tx?"T":"R",s.bank,s.input,BANDS[s.band][0],s.ant+(s.atu?"a":"b"),"0r",s.level,
+      String(pout).padStart(4,"0"),f2(swrAtu,5,2),f2(swrAnt,5,2),f2(tx?46.5:48.2,4,1),f2(tx?pout/45+2:0,4,1),
+      String(Math.round(s.temp)).padStart(3,"0"),"000","000",warn,"N"].join(",")+",";
+  }
+}
+
+/* ---------- App state ---------- */
+const $ = id => document.getElementById(id);
+let link=null, st=null, lastFrameAt=0, pollTimer=null, noReplyWarned=false;
+let peak=0, peakAt=0, target={band:null,level:null,presses:0,last:0,started:0};
+const hist=[]; // {t,p,swr,temp}
+
+function log(msg, bad=false){
+  const d=document.createElement("div");
+  d.innerHTML=`<span class="t">${new Date().toLocaleTimeString()}</span>`;
+  d.appendChild(document.createTextNode(msg));
+  if(bad) d.style.color="#ff8a8a";
+  $("log").prepend(d);
+  while($("log").children.length>200) $("log").lastChild.remove();
+}
+
+function setConn(kind,text){
+  $("connDot").className="dot"+(kind?" "+kind:"");
+  $("connText").textContent=text;
+  $("ui").classList.toggle("disabled-ui",!kind);
+  $("btnConnect").textContent = kind ? "Disconnect" : "Connect amplifier";
+  $("btnConnect").classList.toggle("primary",!kind);
+  $("btnDemo").disabled = !!kind;
+  $("baud").disabled = !!kind;
+}
+
+async function start(l, label, kind){
+  link=l; st=null; noReplyWarned=false; lastFrameAt=Date.now();
+  setConn(kind,label); $("welcome").classList.add("hidden");
+  log(label);
+  pollTimer=setInterval(async()=>{
+    try{ await link.send(CMD.STATUS); }catch(e){ log("Write failed: "+e.message,true); stop(); return; }
+    if (!noReplyWarned && Date.now()-lastFrameAt>4000){
+      noReplyWarned=true;
+      log("No status reply from the amplifier. Check the baud rate (USB is normally 115200), that the amp is on, and that its firmware supports remote status.",true);
+    }
+  },200);
+}
+async function stop(){
+  clearInterval(pollTimer); pollTimer=null;
+  if(link){ const l=link; link=null; await l.close(); }
+  setConn(null,"Not connected"); log("Disconnected.");
+}
+
+async function connectSerial(){
+  if(!("serial" in navigator)){ alert("This browser can't talk to serial ports. Please open this file in Google Chrome or Microsoft Edge."); return; }
+  const baud=+$("baud").value; localStorage.setItem("expBaud",baud);
+  const l=new SerialLink(onFrame,()=>{ log("Amplifier disconnected (USB unplugged?).",true); stop(); });
+  try{ await l.open(baud); }catch(e){ if(e.name!=="NotFoundError") log("Could not open port: "+e.message,true); return; }
+  start(l,`Connected @ ${baud}`,"on");
+}
+
+async function send(c){ if(link) try{ await link.send(c); }catch(e){ log("Write failed: "+e.message,true); } }
+
+/* ---------- Frame handling ---------- */
+function onFrame(text){
+  const s=parseStatus(text);
+  if(!s) return;
+  lastFrameAt=Date.now(); noReplyWarned=false;
+  const prev=st; st=s;
+  if(prev) diffLog(prev,s); else log(`Amplifier ${s.id} found — ${s.operate?"OPERATE":"STANDBY"}, ${bandName(s.band)}.`);
+  driveTargets();
+  render();
+}
+const bandName = c => (BANDS.find(b=>b[0]===c)||[0,"?"])[1];
+const levelName = l => ({L:"Low",M:"Mid",H:"High"})[l]||l;
+
+function diffLog(a,b){
+  if(a.operate!==b.operate) log(b.operate?"Switched to OPERATE.":"Switched to STANDBY.");
+  if(a.band!==b.band) log(`Band → ${bandName(b.band)}`);
+  if(a.level!==b.level) log(`Power level → ${levelName(b.level)}`);
+  if(a.txAnt!==b.txAnt) log(`TX antenna → ${b.txAnt}`);
+  if(a.input!==b.input) log(`Input → ${b.input}`);
+  if(a.warn!==b.warn && b.warn!=="N") log("Warning: "+(WARN[b.warn]?.[0]||b.warn),true);
+  if(a.alarm!==b.alarm && b.alarm!=="N") log("ALARM: "+(ALARM[b.alarm]?.[0]||b.alarm),true);
+  if(a.alarm!=="N" && b.alarm==="N") log("Alarm cleared.");
+}
+
+/* Press Band+/- or Power until the amp reaches what the user clicked */
+function driveTargets(){
+  const now=Date.now();
+  if(target.band===null && target.level===null) return;
+  if(now-target.started>8000 || target.presses>14){
+    log("Couldn't reach the requested setting (the amp may skip that band or be busy).",true);
+    target.band=target.level=null; render(); return;
+  }
+  if(now-target.last<300) return;
+  if(target.band!==null){
+    if(st.tx){ return; }
+    const cur=bandIdx(st.band), want=bandIdx(target.band);
+    if(cur===want){ target.band=null; }
+    else { send(want>cur?CMD.BAND_UP:CMD.BAND_DN); target.presses++; target.last=now; return; }
+  }
+  if(target.level!==null){
+    if(st.level===target.level){ target.level=null; }
+    else { send(CMD.POWER); target.presses++; target.last=now; }
+  }
+}
+function setTarget(kind,val){ target[kind]=val; target.presses=0; target.started=Date.now(); target.last=0; render(); }
+
+/* ---------- Rendering ---------- */
+function swrColor(v){ return v<1.5?"var(--ok)":v<2?"var(--warn)":"var(--bad)"; }
+function setBar(id,pct,color){ const e=$(id); e.style.width=Math.max(0,Math.min(100,pct))+"%"; e.style.background=color; }
+
+function render(){
+  if(!st) return;
+  const s=st, now=Date.now();
+  // Mode
+  $("opBtn").className="opbtn "+(s.operate?"operate":"standby");
+  $("opText").textContent=s.operate?"OPERATE":"STANDBY";
+  $("opHint").textContent=s.operate?"Amplifier is active and will key with the exciter":"Amplifier bypassed, exciter goes straight through";
+  $("txBox").classList.toggle("tx",s.tx);
+  $("txSub").textContent=s.tx?(s.operate?"Transmitting":"Exciter keyed (bypass)"):"Receiving";
+  $("bandText").textContent=bandName(s.band);
+  $("modelPill").textContent="Model: "+s.id;
+  $("inText").textContent="Input "+s.input;
+  $("bankText").textContent="· Bank "+s.bank;
+  document.querySelectorAll("#lvlSeg button").forEach(b=>{ b.classList.toggle("sel",b.dataset.l===s.level); });
+  // Power gauge
+  const max = 1500;
+  if(s.pout>=peak || now-peakAt>3000){ peak=s.pout; peakAt=now; }
+  $("pwrVal").textContent=s.pout;
+  $("peakVal").textContent=peak;
+  const pct=Math.min(100,s.pout/max*100);
+  $("pwrArc").setAttribute("stroke-dasharray",`${pct} 100`);
+  $("pwrArc").setAttribute("stroke", s.pout>max*0.97?"var(--bad)":"var(--accent)");
+  $("peakTick").setAttribute("transform",`rotate(${-90+Math.min(180,peak/max*180)} 110 115)`);
+  // SWR
+  const sw=(v,idV,idB)=>{ if(!s.tx||v<=0){ $(idV).textContent="—"; setBar(idB,0,"var(--ok)"); return; }
+    $(idV).textContent=v.toFixed(2)+" : 1"; $(idV).style.color=swrColor(v); setBar(idB,(v-1)/2*100,swrColor(v)); };
+  sw(s.swrAnt,"swrAntVal","swrAntBar"); sw(s.swrAtu,"swrAtuVal","swrAtuBar");
+  $("vpaVal").textContent=s.vpa.toFixed(1)+" V";
+  $("ipaVal").textContent=s.ipa.toFixed(1)+" A";
+  // Temperature
+  const t=Math.max(s.tUp,s.tLow);
+  $("tempVal").textContent=t+" °C"; $("tempVal").style.color=t<55?"var(--text)":t<70?"var(--warn)":"var(--bad)";
+  setBar("tempBar",(t-20)/60*100,t<55?"var(--ok)":t<70?"var(--warn)":"var(--bad)");
+  const extra=[]; if(s.tLow>0) extra.push(["Upper",s.tUp],["Lower",s.tLow]); if(s.tComb>0) extra.push(["Combiner",s.tComb]);
+  $("tempExtra").innerHTML=extra.map(([k,v])=>`<div class="kv"><div class="k">${k}</div><div class="v">${v} °C</div></div>`).join("");
+  // Alerts
+  const items=[];
+  if(s.alarm!=="N"){ const a=ALARM[s.alarm]||["Alarm code "+s.alarm,"See the amplifier manual."]; items.push(`<div class="alert a"><span class="ic">⛔</span><div><b>${a[0]}</b><span>${a[1]}</span></div></div>`); }
+  if(s.warn!=="N"){ const w=WARN[s.warn]||["Warning code "+s.warn,"See the amplifier manual."]; items.push(`<div class="alert w"><span class="ic">⚠️</span><div><b>${w[0]}</b><span>${w[1]}</span></div></div>`); }
+  if(!items.length) items.push(`<div class="alert ok"><span class="ic">✓</span><div><b>No warnings</b><span>Everything looks normal.</span></div></div>`);
+  $("alerts").innerHTML=items.join("");
+  // Bands
+  document.querySelectorAll("#bands button").forEach(b=>{
+    b.classList.toggle("sel",b.dataset.b===s.band);
+    b.classList.toggle("pending",b.dataset.b===target.band);
+    b.disabled=s.tx;
+  });
+  // Antenna / ATU
+  const ta=s.txAnt.match(/^(\d)(\w?)/), ra=s.rxAnt.match(/^(\d)(\w?)/);
+  $("txAntVal").textContent= ta ? "ANT "+ta[1] : (s.txAnt||"—");
+  $("rxAntVal").textContent= ra ? (ra[1]==="0"?"Same as TX":"RX "+ra[1]) : (s.rxAnt||"—");
+  const atuL = ta ? ta[2] : "";
+  $("atuVal").textContent = atuL==="b" ? "Bypassed" : atuL ? "In line" : "—";
+  $("btnTune").disabled = false;
+  $("raw").textContent=s.raw;
+  // History
+  hist.push({t:now,p:s.pout,swr:s.tx?s.swrAnt:0,temp:t});
+  while(hist.length && now-hist[0].t>120000) hist.shift();
+}
+
+function drawHist(){
+  const c=$("hist"), g=c.getContext("2d"), W=c.width=c.clientWidth*devicePixelRatio, H=c.height=170*devicePixelRatio;
+  g.clearRect(0,0,W,H);
+  g.strokeStyle="#232931"; g.lineWidth=1;
+  for(let i=1;i<4;i++){ g.beginPath(); g.moveTo(0,H*i/4); g.lineTo(W,H*i/4); g.stroke(); }
+  if(hist.length<2) return;
+  const now=Date.now(), x=t=>W-(now-t)/120000*W;
+  const line=(key,scale,color,fill)=>{
+    g.beginPath(); hist.forEach((h,i)=>{ const y=H-Math.min(1,h[key]/scale)*H*0.95; i?g.lineTo(x(h.t),y):g.moveTo(x(h.t),y); });
+    g.strokeStyle=color; g.lineWidth=1.6*devicePixelRatio; g.stroke();
+    if(fill){ g.lineTo(x(hist[hist.length-1].t),H); g.lineTo(x(hist[0].t),H); g.closePath(); g.fillStyle=fill; g.fill(); }
+  };
+  line("p",1500,"#3aa0ff","rgba(58,160,255,.15)");
+  line("swr",3,"#f2b233");
+  line("temp",90,"#c37bff");
+}
+setInterval(drawHist,500);
+
+/* ---------- Wire up controls ---------- */
+BANDS.forEach(([code,name])=>{ const b=document.createElement("button"); b.textContent=name; b.dataset.b=code;
+  b.onclick=()=>{ if(st && st.band!==code) setTarget("band",code); }; $("bands").appendChild(b); });
+document.querySelectorAll("#lvlSeg button").forEach(b=>b.onclick=()=>{ if(st && st.level!==b.dataset.l) setTarget("level",b.dataset.l); });
+document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>send(CMD[b.dataset.k]));
+$("opBtn").onclick=()=>send(CMD.OPERATE);
+$("btnAnt").onclick=()=>send(CMD.ANT);
+$("btnTune").onclick=()=>{ if(st && !st.tx) log("Tip: key a low-power carrier on the exciter, then press Tune."); send(CMD.TUNE); };
+$("btnInput").onclick=()=>send(CMD.INPUT);
+$("btnOff").onclick=()=>{ if(confirm("Switch the Expert amplifier OFF?")) send(CMD.OFF); };
+$("btnConnect").onclick=()=> link ? stop() : connectSerial();
+$("wConnect").onclick=connectSerial;
+const demo=()=>start(new DemoLink(onFrame),"Demo mode (simulated amp)","demo");
+$("btnDemo").onclick=demo; $("wDemo").onclick=demo;
+const sb=localStorage.getItem("expBaud"); if(sb) $("baud").value=sb;
+
+document.addEventListener("keydown",e=>{
+  if(!link || !st || e.ctrlKey || e.altKey || e.target.tagName==="SELECT") return;
+  const k=e.key.toLowerCase();
+  if(k==="o") send(CMD.OPERATE);
+  else if(k==="p") send(CMD.POWER);
+  else if(k==="a") send(CMD.ANT);
+  else if(k==="t") send(CMD.TUNE);
+  else if(k==="i") send(CMD.INPUT);
+  else if(e.key==="ArrowRight" && !st.tx) send(CMD.BAND_UP);
+  else if(e.key==="ArrowLeft" && !st.tx) send(CMD.BAND_DN);
+  else return;
+  e.preventDefault();
+});
+</script>
+</body>
+</html>
