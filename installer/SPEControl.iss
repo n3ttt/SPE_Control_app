@@ -1,6 +1,6 @@
 ; Inno Setup script for SPE Control. Built by build.ps1.
 #define AppName "SPE Control"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppExe "SPEControl.exe"
 
 [Setup]
@@ -41,7 +41,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 ; Let phones and tablets on the home network reach the panel (the app itself refuses anything not on the local network).
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#AppName}"""; Flags: runhidden
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""{#AppName}"" dir=in action=allow program=""{app}\{#AppExe}"" enable=yes profile=any protocol=TCP"; Flags: runhidden
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""{#AppName}"" dir=in action=allow program=""{app}\{#AppExe}"" enable=yes profile=any"; Flags: runhidden
 Filename: "{app}\{#AppExe}"; Description: "Open SPE Control now"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]

@@ -20,8 +20,8 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("SPE Control")]
 [assembly: AssemblyProduct("SPE Control")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 static class Program
 {
@@ -48,7 +48,9 @@ static class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        AmpLink amp = new AmpLink(simulate);
+        RadioListener radio = new RadioListener();
+        radio.Start();
+        AmpLink amp = new AmpLink(simulate, radio);
         amp.Start();
 
         WebServer web = new WebServer(amp, Settings.HttpPort);
@@ -109,6 +111,8 @@ static class Settings
     public static string Port = "auto";
     public static int HttpPort = 8080;
     public static int Baud = 115200;
+    public static bool Follow = true;        // amp follows the radio's band (from logger RadioInfo packets)
+    public static int RadioPort = 12060;     // N1MM-compatible RadioInfo UDP port
 
     static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SPE Control"); } }
     static string FilePath { get { return Path.Combine(Dir, "settings.txt"); } }
@@ -127,6 +131,8 @@ static class Settings
                 if (k == "port" && v.Length > 0) Port = v;
                 else if (k == "httpport" && int.TryParse(v, out n)) HttpPort = n;
                 else if (k == "baud" && int.TryParse(v, out n)) Baud = n;
+                else if (k == "follow") Follow = v != "0" && v.ToLowerInvariant() != "false";
+                else if (k == "radioport" && int.TryParse(v, out n)) RadioPort = n;
             }
         }
         catch { }
@@ -137,7 +143,8 @@ static class Settings
         try
         {
             Directory.CreateDirectory(Dir);
-            File.WriteAllText(FilePath, "port=" + Port + "\r\nhttpport=" + HttpPort + "\r\nbaud=" + Baud + "\r\n");
+            File.WriteAllText(FilePath, "port=" + Port + "\r\nhttpport=" + HttpPort + "\r\nbaud=" + Baud +
+                "\r\nfollow=" + (Follow ? "1" : "0") + "\r\nradioport=" + RadioPort + "\r\n");
         }
         catch { }
     }
@@ -178,7 +185,62 @@ class AmpLink
     int autoIndex;
     Simulator sim;
 
-    public AmpLink(bool simulate) { this.simulate = simulate; }
+    public readonly RadioListener Radio;
+    string followFor, followNote = "";
+    int followPresses;
+    DateTime lastPress = DateTime.MinValue;
+
+    public AmpLink(bool simulate, RadioListener radio) { this.simulate = simulate; Radio = radio; }
+
+    public string FollowNote { get { lock (lk) return followNote; } }
+
+    static bool ParseFrame(string frame, out string band, out bool tx)
+    {
+        band = null; tx = false;
+        if (frame == null) return false;
+        string[] f = frame.Split(',');
+        for (int i = 0; i + 5 < f.Length; i++)
+        {
+            if (Regex.IsMatch(f[i].Trim(), @"^\d\dK$"))
+            {
+                tx = f[i + 2].Trim() == "T";
+                band = f[i + 5].Trim();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Band-follow: decide whether to press Band+ or Band- so the amp matches the radio.
+    // One press at a time, only after a fresh status frame, never while either side transmits.
+    byte? FollowKey()
+    {
+        double khz, age; string md, app; bool rtx;
+        if (!Settings.Follow || Radio == null || !Radio.Get(out khz, out md, out rtx, out age, out app) || age > 30)
+        {
+            lock (lk) followNote = "";
+            return null;
+        }
+        string want = RadioListener.BandFor(khz);
+        string frame; DateTime frameAt;
+        lock (lk) { frame = lastFrame; frameAt = lastFrameAt; }
+        string band; bool atx;
+        if (want == null || (DateTime.UtcNow - frameAt).TotalSeconds > 2 || !ParseFrame(frame, out band, out atx)) return null;
+
+        if (want != followFor) { followFor = want; followPresses = 0; }
+        if (band == want) { lock (lk) followNote = ""; return null; }
+        if (atx || rtx) return null;
+        if (followPresses >= 12)
+        {
+            lock (lk) followNote = "Couldn't move the amp to the radio's band. Check that band is enabled on the amp.";
+            return null;
+        }
+        if (frameAt <= lastPress || (DateTime.UtcNow - lastPress).TotalMilliseconds < 350) return null;
+        followPresses++;
+        lastPress = DateTime.UtcNow;
+        lock (lk) followNote = "Changing band to match the radio...";
+        return string.CompareOrdinal(want, band) > 0 ? (byte)0x03 : (byte)0x02;
+    }
 
     public void Start()
     {
@@ -224,6 +286,8 @@ class AmpLink
         {
             byte? c = NextCmd();
             if (c.HasValue) sim.Key(c.Value);
+            byte? fk = FollowKey();
+            if (fk.HasValue) sim.Key(fk.Value);
             string f = sim.Frame();
             lock (lk) { lastFrame = f; lastFrameAt = DateTime.UtcNow; }
             Thread.Sleep(200);
@@ -259,6 +323,7 @@ class AmpLink
                 while (!reconnect)
                 {
                     byte? c = NextCmd();
+                    if (!c.HasValue) c = FollowKey();
                     if (c.HasValue) { sp.Write(Packet(c.Value), 0, 6); Thread.Sleep(40); }
 
                     if ((DateTime.UtcNow - lastPoll).TotalMilliseconds >= 200)
@@ -442,6 +507,95 @@ class Simulator
     }
 }
 
+// ---------------------------------------------------------------- radio (logger) link
+// Listens for N1MM Logger+ compatible <RadioInfo> UDP packets, as sent by TTTLog
+// (Config > Rotor & N1MM broadcasts), N1MM+, DXLog and others.
+class RadioListener
+{
+    readonly object lk = new object();
+    double khz; string mode = ""; bool tx; string app = "";
+    DateTime at = DateTime.MinValue;
+    public string Error;
+
+    public void Start()
+    {
+        Thread t = new Thread(Run);
+        t.IsBackground = true;
+        t.Name = "RadioListener";
+        t.Start();
+    }
+
+    void Run()
+    {
+        UdpClient u;
+        try
+        {
+            u = new UdpClient();
+            // Share the port with other listeners (rotor/antenna programs) on this computer.
+            u.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            u.Client.Bind(new IPEndPoint(IPAddress.Any, Settings.RadioPort));
+        }
+        catch (Exception ex)
+        {
+            Error = "Can't listen for the radio on UDP port " + Settings.RadioPort + ": " + ex.Message;
+            return;
+        }
+        while (true)
+        {
+            try
+            {
+                IPEndPoint ep = new IPEndPoint(IPAddress.Any, 0);
+                byte[] data = u.Receive(ref ep);
+                if (!WebServer.IsLocalAddress(ep.Address)) continue;
+                Parse(Encoding.UTF8.GetString(data));
+            }
+            catch { Thread.Sleep(100); }
+        }
+    }
+
+    void Parse(string xml)
+    {
+        if (xml.IndexOf("<RadioInfo>", StringComparison.Ordinal) < 0) return;
+        Dictionary<string, string> f = new Dictionary<string, string>();
+        foreach (Match m in Regex.Matches(xml, @"<(\w+)>([^<]*)</\1>")) f[m.Groups[1].Value] = m.Groups[2].Value;
+        string s;
+        // In SO2R, only follow the radio that is currently active.
+        if (f.TryGetValue("ActiveRadioNr", out s) && f.ContainsKey("RadioNr") && s != f["RadioNr"] && s != "0") return;
+        long tens;
+        string fs = f.TryGetValue("TXFreq", out s) && s.Length > 0 && s != "0" ? s : (f.TryGetValue("Freq", out s) ? s : null);
+        if (fs == null || !long.TryParse(fs, out tens) || tens <= 0) return;
+        lock (lk)
+        {
+            khz = tens / 100.0;
+            mode = f.TryGetValue("Mode", out s) ? s : "";
+            tx = f.TryGetValue("IsTransmitting", out s) && s.Equals("True", StringComparison.OrdinalIgnoreCase);
+            app = f.TryGetValue("app", out s) ? s : "";
+            at = DateTime.UtcNow;
+        }
+    }
+
+    // age = seconds since the last packet (loggers repeat every ~10 s, and on every change)
+    public bool Get(out double kHz, out string md, out bool transmitting, out double age, out string from)
+    {
+        lock (lk)
+        {
+            kHz = khz; md = mode; transmitting = tx; from = app;
+            age = at == DateTime.MinValue ? 9999 : (DateTime.UtcNow - at).TotalSeconds;
+            return at != DateTime.MinValue;
+        }
+    }
+
+    // Expert band code for a frequency, or null when it's outside the ham bands the amp covers.
+    public static string BandFor(double k)
+    {
+        double[,] edges = { { 1800, 2000 }, { 3500, 4000 }, { 5250, 5450 }, { 7000, 7300 }, { 10100, 10150 }, { 14000, 14350 },
+                            { 18068, 18168 }, { 21000, 21450 }, { 24890, 24990 }, { 28000, 29700 }, { 50000, 54000 } };
+        for (int i = 0; i <= edges.GetUpperBound(0); i++)
+            if (k >= edges[i, 0] && k <= edges[i, 1]) return i.ToString("00");
+        return null;
+    }
+}
+
 // ---------------------------------------------------------------- web server
 class WebServer
 {
@@ -538,6 +692,12 @@ class WebServer
                 }
                 else Send(ns, 400, "application/json", Encoding.ASCII.GetBytes("{\"ok\":false}"));
             }
+            else if (method == "POST" && path == "/api/follow")
+            {
+                Settings.Follow = QueryValue(query, "on") == "1";
+                Settings.Save();
+                Send(ns, 200, "application/json", Encoding.ASCII.GetBytes("{\"ok\":true}"));
+            }
             else Send(ns, 404, "text/plain", Encoding.ASCII.GetBytes("Not found"));
         }
         catch { }
@@ -578,6 +738,18 @@ class WebServer
         sb.Append(",\"port\":").Append(J(p));
         sb.Append(",\"frame\":").Append(J(frame));
         sb.Append(",\"age\":").Append(Math.Round(Math.Min(age, 9999), 2).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        System.Globalization.CultureInfo ic = System.Globalization.CultureInfo.InvariantCulture;
+        double khz, rage; string md, app; bool rtx;
+        sb.Append(",\"follow\":").Append(Settings.Follow ? "true" : "false");
+        sb.Append(",\"followNote\":").Append(J(amp.FollowNote));
+        sb.Append(",\"radioError\":").Append(J(amp.Radio.Error));
+        if (amp.Radio.Get(out khz, out md, out rtx, out rage, out app))
+            sb.Append(",\"radio\":{\"khz\":").Append(khz.ToString("0.##", ic))
+              .Append(",\"mode\":").Append(J(md)).Append(",\"tx\":").Append(rtx ? "true" : "false")
+              .Append(",\"band\":").Append(J(RadioListener.BandFor(khz)))
+              .Append(",\"app\":").Append(J(app))
+              .Append(",\"age\":").Append(Math.Round(Math.Min(rage, 9999), 1).ToString(ic)).Append('}');
+        else sb.Append(",\"radio\":null");
         sb.Append(",\"urls\":[");
         List<string> u = Urls;
         for (int i = 0; i < u.Count; i++) { if (i > 0) sb.Append(','); sb.Append(J(u[i])); }
@@ -615,7 +787,7 @@ class TrayContext : ApplicationContext
     readonly AmpLink amp;
     readonly WebServer web;
     readonly NotifyIcon icon;
-    readonly ToolStripMenuItem statusItem, addrItem, portMenu, startupItem;
+    readonly ToolStripMenuItem statusItem, addrItem, portMenu, startupItem, followItem;
     readonly System.Windows.Forms.Timer timer;
 
     public TrayContext(AmpLink amp, WebServer web, bool startup)
@@ -643,6 +815,13 @@ class TrayContext : ApplicationContext
             startupItem.Checked = Settings.StartWithWindows;
         });
         startupItem.Checked = Settings.StartWithWindows;
+        followItem = new ToolStripMenuItem("Amp follows the radio (TTTLog / N1MM)", null, delegate
+        {
+            Settings.Follow = !Settings.Follow;
+            Settings.Save();
+        });
+        menu.Items.Add(followItem);
+        menu.Opening += delegate { followItem.Checked = Settings.Follow; };
         menu.Items.Add(startupItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Exit", null, delegate { ExitApp(); }));

@@ -111,6 +111,8 @@
   .overlay h3{margin:0 0 10px}
   .overlay p{color:var(--muted);line-height:1.5}
   .hidden{display:none!important}
+  .follow{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:6px;cursor:pointer;color:var(--text)}
+  .follow input{width:18px;height:18px;accent-color:var(--accent)}
   .server-mode .local-only, .server-mode #welcome{display:none!important}
   @media (max-width:600px){ header{padding:10px 12px} main{padding:10px;gap:10px} .opbtn{flex:1 1 100%} .txbox{flex:1 1 40%} .keys{grid-template-columns:repeat(3,1fr)} }
   .disabled-ui{opacity:.45;pointer-events:none}
@@ -141,6 +143,12 @@
       </button>
       <div class="txbox" id="txBox"><span class="big">TX</span><span class="sub" id="txSub">Receiving</span></div>
       <div class="kv"><div class="k">Band</div><div class="v" id="bandText">—</div></div>
+      <div class="kv hidden" id="radioKv">
+        <div class="k">Radio <span id="radioFrom"></span></div>
+        <div class="v" id="radioFreq">No radio info</div>
+        <label class="follow"><input type="checkbox" id="followChk"> Amp follows radio</label>
+        <div class="k" id="followNote" style="color:var(--warn)"></div>
+      </div>
       <div class="kv"><div class="k">Power level <kbd>P</kbd></div>
         <div class="seg" id="lvlSeg">
           <button data-l="L" title="Low">LOW</button><button data-l="M" title="Mid">MID</button><button data-l="H" title="High">HIGH</button>
@@ -201,7 +209,7 @@
   <section class="card c5">
     <h2>Band — click to jump straight there</h2>
     <div class="bands" id="bands"></div>
-    <div class="hint">The amp only has Band&nbsp;+/− keys, so this panel presses them for you until it lands on the band you picked. Disabled while transmitting. <kbd>←</kbd> <kbd>→</kbd> step one band.</div>
+    <div class="hint" id="bandHint">The amp only has Band&nbsp;+/− keys, so this panel presses them for you until it lands on the band you picked. Disabled while transmitting.</div>
   </section>
 
   <!-- Antenna / ATU -->
@@ -565,8 +573,11 @@ function render(){
   document.querySelectorAll("#bands button").forEach(b=>{
     b.classList.toggle("sel",b.dataset.b===s.band);
     b.classList.toggle("pending",b.dataset.b===target.band);
-    b.disabled=s.tx;
+    b.disabled=s.tx || following;
   });
+  $("bandHint").textContent = following
+    ? "The amp is following the radio's band. Untick \"Amp follows radio\" to pick a band by hand."
+    : "The amp only has Band +/− keys, so this panel presses them for you until it lands on the band you picked. Disabled while transmitting.";
   // Antenna / ATU
   const ta=s.txAnt.match(/^(\d)(\w?)/), ra=s.rxAnt.match(/^(\d)(\w?)/);
   $("txAntVal").textContent= ta ? "ANT "+ta[1] : (s.txAnt||"—");
@@ -615,7 +626,8 @@ $("btnDemo").onclick=demo; $("wDemo").onclick=demo;
 const sb=localStorage.getItem("expBaud"); if(sb) $("baud").value=sb;
 
 /* Server mode: when this page is opened from the SPE Control app, connect automatically. */
-let lastServerState="";
+let lastServerState="", following=false;
+$("followChk").onchange=e=>fetch("/api/follow?on="+(e.target.checked?1:0),{method:"POST"});
 function onServerInfo(j){
   if(!j){ setConn(null,"Lost contact with the SPE Control computer"); $("ui").classList.add("disabled-ui"); return; }
   const live = j.frame && j.age<3;
@@ -623,6 +635,21 @@ function onServerInfo(j){
   $("connText").textContent = live ? "Amplifier connected" : j.state;
   $("ui").classList.toggle("disabled-ui",!live);
   if(j.state!==lastServerState){ lastServerState=j.state; log(j.state, !live); }
+  // Radio from the logger (TTTLog / N1MM RadioInfo)
+  $("radioKv").classList.remove("hidden");
+  const r=j.radio, fresh = r && r.age<30;
+  if(document.activeElement!==$("followChk")) $("followChk").checked=!!j.follow;
+  if(fresh){
+    $("radioFreq").textContent=(r.khz/1000).toFixed(3)+" MHz "+(r.mode||"");
+    $("radioFrom").textContent=r.app?"("+r.app+")":"";
+  } else {
+    $("radioFreq").textContent="No radio info";
+    $("radioFrom").textContent="";
+  }
+  $("followNote").textContent = j.radioError || j.followNote ||
+    (j.follow && !fresh ? "Turn on Config ▸ Rotor & N1MM broadcasts ▸ RadioInfo in TTTLog" : "") ||
+    (j.follow && fresh && !r.band ? "Radio is outside the amp's bands" : "");
+  following = !!(j.follow && fresh && r.band);
   const here = location.hostname==="localhost"||location.hostname==="127.0.0.1";
   if(here && j.urls && j.urls.length){ $("lanPill").classList.remove("hidden"); $("lanUrl").textContent=j.urls[0].replace(/\/$/,""); }
 }
@@ -645,8 +672,8 @@ document.addEventListener("keydown",e=>{
   else if(k==="a") send(CMD.ANT);
   else if(k==="t") send(CMD.TUNE);
   else if(k==="i") send(CMD.INPUT);
-  else if(e.key==="ArrowRight" && !st.tx) send(CMD.BAND_UP);
-  else if(e.key==="ArrowLeft" && !st.tx) send(CMD.BAND_DN);
+  else if(e.key==="ArrowRight" && !st.tx && !following) send(CMD.BAND_UP);
+  else if(e.key==="ArrowLeft" && !st.tx && !following) send(CMD.BAND_DN);
   else return;
   e.preventDefault();
 });
