@@ -3,7 +3,7 @@
 ; AppName stays as the internal id (install folder, startup entry, firewall rule) so upgrades keep working.
 ; AppLabel is what people see.
 #define AppLabel "Expert Amp Control"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 #define AppExe "SPEControl.exe"
 
 [Setup]
