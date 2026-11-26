@@ -18,14 +18,16 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("SPE Control")]
-[assembly: AssemblyProduct("SPE Control")]
+[assembly: AssemblyTitle("Expert Amp Control")]
+[assembly: AssemblyProduct("Expert Amp Control")]
 [assembly: AssemblyVersion("1.1.0.0")]
 [assembly: AssemblyFileVersion("1.1.0.0")]
 
 static class Program
 {
+    // AppName is the internal id (startup registry value, settings folder): keep it so upgrades still work.
     public const string AppName = "SPE Control";
+    public const string DisplayName = "Expert Amp Control";
     public const string MutexName = "SPEControlPanelServer";
 
     [STAThread]
@@ -57,9 +59,9 @@ static class Program
         try { web.Start(); }
         catch (Exception ex)
         {
-            MessageBox.Show("SPE Control could not start its web server on port " + Settings.HttpPort +
+            MessageBox.Show("Expert Amp Control could not start its web server on port " + Settings.HttpPort +
                 ".\n\nAnother program may be using that port.\n\n" + ex.Message,
-                AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                DisplayName, MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
 
@@ -832,7 +834,7 @@ class TrayContext : ApplicationContext
 
         icon = new NotifyIcon();
         try { icon.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { icon.Icon = SystemIcons.Application; }
-        icon.Text = Program.AppName;
+        icon.Text = Program.DisplayName;
         icon.ContextMenuStrip = menu;
         icon.Visible = true;
         icon.DoubleClick += delegate { OpenPanel(); };
@@ -844,7 +846,7 @@ class TrayContext : ApplicationContext
         UpdateStatus();
 
         if (!startup) OpenPanel();
-        icon.ShowBalloonTip(5000, Program.AppName + " is running",
+        icon.ShowBalloonTip(5000, Program.DisplayName + " is running",
             "Double-click this icon to open the control panel. Right-click for phone/tablet setup.", ToolTipIcon.Info);
     }
 
@@ -853,7 +855,7 @@ class TrayContext : ApplicationContext
         string frame, st, p; double age;
         amp.Snapshot(out frame, out age, out st, out p);
         statusItem.Text = (age < 3 ? "Amplifier: connected" : "Amplifier: ") + (age < 3 ? (p != null ? " (" + p + ")" : "") : Shorten(st));
-        string tip = Program.AppName + " - " + (age < 3 ? "amp connected" : "amp not connected");
+        string tip = Program.DisplayName + " - " + (age < 3 ? "amp connected" : "amp not connected");
         icon.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
     }
 
@@ -901,7 +903,7 @@ class TrayContext : ApplicationContext
             ? "This computer doesn't seem to be on a network right now."
             : "On the phone or tablet, connect to the same Wi-Fi as this computer, open the web browser and type:\n\n    " +
               string.Join("\n    ", u.ToArray()) + "\n\nTip: add it to the home screen so it works like an app.\n\nCopy the address to the clipboard?";
-        if (MessageBox.Show(msg, Program.AppName, u.Count == 0 ? MessageBoxButtons.OK : MessageBoxButtons.YesNo,
+        if (MessageBox.Show(msg, Program.DisplayName, u.Count == 0 ? MessageBoxButtons.OK : MessageBoxButtons.YesNo,
                 MessageBoxIcon.Information) == DialogResult.Yes)
         {
             try { Clipboard.SetText(u[0]); } catch { }
@@ -910,8 +912,8 @@ class TrayContext : ApplicationContext
 
     void ExitApp()
     {
-        if (MessageBox.Show("Stop SPE Control?\n\nPhones, tablets and this computer will no longer be able to control the amplifier until it is started again.",
-                Program.AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show("Stop Expert Amp Control?\n\nPhones, tablets and this computer will no longer be able to control the amplifier until it is started again.",
+                Program.DisplayName, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         icon.Visible = false;
         icon.Dispose();
         timer.Stop();

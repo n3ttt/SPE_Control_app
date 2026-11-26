@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#0f1216">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="SPE Control">
-<title>SPE Expert Control Panel</title>
+<meta name="apple-mobile-web-app-title" content="Expert Amp">
+<title>Expert Amp Control</title>
 <style>
   :root{
     --bg:#0f1216; --panel:#171b21; --panel2:#1e232b; --line:#2a313b; --text:#e6e9ee; --muted:#8b95a3;
@@ -206,7 +206,7 @@
   <div class="m-foot" id="mFoot"></div>
 </div>
 <header>
-  <h1 id="hTitle">SPE Expert Control</h1>
+  <h1>Expert Amp Control</h1>
   <span class="pill"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></span>
   <span class="pill" id="modelPill" title="Model reported by the amplifier">Model: —</span>
   <span class="pill hidden" id="lanPill" title="Type this into the browser on a phone or tablet on the same Wi-Fi">📱 Phones &amp; tablets: <b id="lanUrl" style="color:var(--text);user-select:all"></b></span>
@@ -634,7 +634,6 @@ function render(){
   // Power gauge
   const max = maxPower();
   $("pwrMaxLbl").textContent=max;
-  const mname=modelName(); if(mname){ $("hTitle").textContent=mname+" Control"; document.title=mname+" Control Panel"; }
   if(s.pout>=peak || now-peakAt>3000){ peak=s.pout; peakAt=now; }
   $("pwrVal").textContent=s.pout;
   $("peakVal").textContent=peak;
@@ -776,7 +775,7 @@ $("mFull").onclick=()=>{ const u=new URL(location.href); u.searchParams.delete("
 let lastServerState="", following=false, radioText="";
 $("followChk").onchange=e=>fetch("/api/follow?on="+(e.target.checked?1:0),{method:"POST"});
 function onServerInfo(j){
-  if(!j){ setConn(null,"Lost contact with the SPE Control computer"); $("ui").classList.add("disabled-ui"); $("mini").classList.add("disabled-ui"); return; }
+  if(!j){ setConn(null,"Lost contact with the Expert Amp Control computer"); $("ui").classList.add("disabled-ui"); $("mini").classList.add("disabled-ui"); return; }
   const live = j.frame && j.age<3;
   $("connDot").className="dot"+(live?" on":"");
   $("connText").textContent = live ? "Amplifier connected" : j.state;
@@ -809,7 +808,7 @@ function onServerInfo(j){
     const r=await fetch("/api/status",{cache:"no-store"}); const j=await r.json();
     if(!j.server) return;
     document.body.classList.add("server-mode");
-    start(new ServerLink(onFrame,onServerInfo),"Using SPE Control on "+location.host,"on");
+    start(new ServerLink(onFrame,onServerInfo),"Using Expert Amp Control on "+location.host,"on");
     $("ui").classList.add("disabled-ui");
   }catch(e){}
 })();

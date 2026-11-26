@@ -1,6 +1,6 @@
-# SPE Control
+# Expert Amp Control
 
-A friendlier control panel for the SPE Expert 1.5K-FA linear amplifier, usable from any computer, phone or tablet on the home network.
+A friendlier control panel for SPE Expert linear amplifiers (1.5K-FA, 2K-FA), usable from any computer, phone or tablet on the home network.
 
 It shows gauges, explains warnings in plain English, lets you select bands and power levels with one click, and keeps a 2-minute history graph and an event log.
 
@@ -32,7 +32,7 @@ The app answers only devices on the local network and VPN addresses such as Tail
 
 ## Amp follows the radio (TTTLog, N1MM+ and others)
 
-SPE Control listens for N1MM-compatible **RadioInfo** packets on UDP port 12060. When the radio moves to another band, the app presses the amp's Band keys until the amp matches.
+Expert Amp Control listens for N1MM-compatible **RadioInfo** packets on UDP port 12060. When the radio moves to another band, the app presses the amp's Band keys until the amp matches.
 
 - It never changes band while the amp or the radio is transmitting.
 - It ignores frequencies outside the ham bands, so tuning to WWV won't move the amp.
@@ -41,7 +41,7 @@ SPE Control listens for N1MM-compatible **RadioInfo** packets on UDP port 12060.
 
 **TTTLog setup:**
 1. Go to **Config ▸ Rotor & N1MM broadcasts**.
-2. Tick **RadioInfo**. The default target, `127.0.0.1:12060`, is right when TTTLog runs on the same PC as SPE Control.
+2. Tick **RadioInfo**. The default target, `127.0.0.1:12060`, is right when TTTLog runs on the same PC as Expert Amp Control.
 3. If TTTLog runs on a different PC, add that PC's address, for example `127.0.0.1:12060 192.168.1.188:12060`.
 
 To test without a radio, run `.\tools\send-radioinfo.ps1 -kHz 7025`.
