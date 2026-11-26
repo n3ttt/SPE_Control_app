@@ -6,10 +6,13 @@ It shows gauges, explains warnings in plain English, lets you select bands and p
 
 ## Installing (Windows)
 
-1. Run **SPEControl-Setup.exe**.
+1. Download **SPEControl-Setup.exe** from the [latest release](https://github.com/n3ttt/SPE_Control_app/releases/latest).
+2. Open the downloaded file.
    Windows may show "Windows protected your PC" because the app isn't code-signed. Click **More info**, then **Run anyway**.
-2. Click through the installer. It starts the app at the end.
-3. Plug the amplifier in by USB. The app finds it automatically.
+3. Click through the installer. It starts the app at the end.
+4. Plug the amplifier in by USB. The app finds it automatically.
+
+To update, run the new installer over the old one. You don't need to uninstall first, and your settings are kept. To remove the app, use **Settings ▸ Apps ▸ Installed apps ▸ Expert Amp Control ▸ Uninstall**.
 
 A gauge icon appears by the clock in the taskbar's notification area.
 - **Double-click it** to open the panel.
