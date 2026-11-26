@@ -195,7 +195,7 @@
   <button class="m-op standby" id="mOp" title="Toggle Operate / Standby  (O)">STANDBY</button>
   <div class="m-tx" id="mTx">TX</div>
   <div class="m-card m-pwr">
-    <div class="m-row"><span class="m-k">Output</span><span class="sp"></span><span class="m-k m-pk" title="Peak output, 3 s hold">Peak <b id="mPwrPk">0</b></span><span class="sp"></span><span class="m-v" id="mPwr">0</span><span class="m-k">W</span></div>
+    <div class="m-row"><span class="m-k">Output</span><span class="sp"></span><span class="m-k m-pk" title="Peak output, held for 10 seconds">Peak <b id="mPwrPk">0</b></span><span class="sp"></span><span class="m-v" id="mPwr">0</span><span class="m-k">W</span></div>
     <div class="pk"><div class="bar"><i id="mPwrBar"></i></div><b id="mPeakTick"></b></div>
   </div>
   <div class="m-card m-swr"><div class="m-row"><span class="m-k" title="Highest SWR, held for 10 seconds">SWR peak</span><span class="sp"></span><span class="m-v" id="mSwr">—</span></div><div class="pk"><div class="bar"><i id="mSwrBar"></i></div><b id="mSwrTick"></b></div></div>
@@ -260,7 +260,7 @@
         <text x="200" y="128" fill="#5d6673" font-size="9" text-anchor="middle" id="pwrMaxLbl">1500</text>
       </svg>
       <div class="val"><span id="pwrVal">0</span><small> W</small></div>
-      <div class="peak">Peak (3 s hold): <span id="peakVal">0</span> W</div>
+      <div class="peak">Peak (10 s hold): <span id="peakVal">0</span> W</div>
     </div>
   </section>
 
@@ -619,7 +619,7 @@ function setTarget(kind,val){ target[kind]=val; target.presses=0; target.started
 
 /* ---------- Rendering ---------- */
 /* SWR peak hold: the highest reading is held for 10 s, then follows the live reading again (or clears after unkey). */
-const SWR_HOLD_MS=10000;
+const PEAK_HOLD_MS=10000, SWR_HOLD_MS=PEAK_HOLD_MS;  // output and SWR peaks both hold 10 s
 function holdSwr(p,v,tx,now){
   const live=tx&&v>0;
   if(live&&(v>=p.v||now-p.at>SWR_HOLD_MS)){ p.v=v; p.at=now; }
@@ -647,7 +647,7 @@ function render(){
   // Power gauge
   const max = maxPower();
   $("pwrMaxLbl").textContent=max;
-  if(s.pout>=peak || now-peakAt>3000){ peak=s.pout; peakAt=now; }
+  if(s.pout>=peak || now-peakAt>PEAK_HOLD_MS){ peak=s.pout; peakAt=now; }
   $("pwrVal").textContent=s.pout;
   $("peakVal").textContent=peak;
   const pct=Math.min(100,s.pout/max*100);
