@@ -65,6 +65,7 @@ static class Program
             return;
         }
 
+        Updater.Start();
         Application.Run(new TrayContext(amp, web, startup));
         GC.KeepAlive(mutex);
     }
@@ -115,6 +116,7 @@ static class Settings
     public static int Baud = 115200;
     public static bool Follow = true;        // amp follows the radio's band (from logger RadioInfo packets)
     public static int RadioPort = 12060;     // N1MM-compatible RadioInfo UDP port
+    public static bool Betas = false;        // also offer pre-release (beta) updates
 
     static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SPE Control"); } }
     static string FilePath { get { return Path.Combine(Dir, "settings.txt"); } }
@@ -135,6 +137,7 @@ static class Settings
                 else if (k == "baud" && int.TryParse(v, out n)) Baud = n;
                 else if (k == "follow") Follow = v != "0" && v.ToLowerInvariant() != "false";
                 else if (k == "radioport" && int.TryParse(v, out n)) RadioPort = n;
+                else if (k == "betas") Betas = v == "1" || v.ToLowerInvariant() == "true";
             }
         }
         catch { }
@@ -146,7 +149,7 @@ static class Settings
         {
             Directory.CreateDirectory(Dir);
             File.WriteAllText(FilePath, "port=" + Port + "\r\nhttpport=" + HttpPort + "\r\nbaud=" + Baud +
-                "\r\nfollow=" + (Follow ? "1" : "0") + "\r\nradioport=" + RadioPort + "\r\n");
+                "\r\nfollow=" + (Follow ? "1" : "0") + "\r\nradioport=" + RadioPort + "\r\nbetas=" + (Betas ? "1" : "0") + "\r\n");
         }
         catch { }
     }
@@ -599,6 +602,101 @@ class RadioListener
 }
 
 // ---------------------------------------------------------------- web server
+// Checks GitHub for a newer release: shortly after start, then once a day.
+// Normally uses releases/latest, which skips drafts and pre-releases; with the
+// "Include beta versions" setting on it looks at the newest release of any kind.
+static class Updater
+{
+    const string Api = "https://api.github.com/repos/n3ttt/SPE_Control_app/releases/latest";
+    const string ApiAll = "https://api.github.com/repos/n3ttt/SPE_Control_app/releases?per_page=10";
+    public const string ReleasesPage = "https://github.com/n3ttt/SPE_Control_app/releases/latest";
+    static readonly object gate = new object();
+    static string latest, url, error;
+    static DateTime checkedAt = DateTime.MinValue;
+
+    public static Version Current { get { return Assembly.GetExecutingAssembly().GetName().Version; } }
+    public static string CurrentText { get { Version v = Current; return v.Major + "." + v.Minor + "." + v.Build; } }
+
+    /// <summary>Newer version available (e.g. "1.3.0") or null, with the page to download it from.</summary>
+    public static string Available(out string link)
+    {
+        lock (gate) { link = url; return latest; }
+    }
+    public static string LastError { get { lock (gate) return error; } }
+    public static DateTime CheckedAt { get { lock (gate) return checkedAt; } }
+
+    public static void Start()
+    {
+        Thread t = new Thread(delegate ()
+        {
+            Thread.Sleep(20000);   // let the amp link and web server settle first
+            while (true)
+            {
+                Check();
+                Thread.Sleep(TimeSpan.FromHours(24));
+            }
+        });
+        t.IsBackground = true;
+        t.Start();
+    }
+
+    /// <summary>Reads a GitHub releases response; true if it holds a version newer than cur.</summary>
+    public static bool Parse(string json, bool betas, Version cur, out string ver, out string link)
+    {
+        if (betas)
+        {
+            // The list is newest first; skip drafts (only visible to the owner anyway) and take the highest version.
+            string best = null; Version bestV = null;
+            foreach (string rel in Regex.Split(json, "\\{\\s*\"url\"\\s*:\\s*\"https://api\\.github\\.com/repos/[^\"]+/releases/\\d+\""))
+            {
+                if (Regex.IsMatch(rel, "\"draft\"\\s*:\\s*true")) continue;
+                Match m = Regex.Match(rel, "\"tag_name\"\\s*:\\s*\"v?(\\d+(?:\\.\\d+){1,3})");
+                if (!m.Success) continue;
+                Version rv = new Version(m.Groups[1].Value);
+                if (bestV == null || rv > bestV) { bestV = rv; best = rel; }
+            }
+            if (best == null) throw new Exception("No releases found.");
+            json = best;
+        }
+        Match tag = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"v?(\\d+(?:\\.\\d+){1,3})");
+        if (!tag.Success) throw new Exception("No version in the latest release.");
+        Match setup = Regex.Match(json, "\"browser_download_url\"\\s*:\\s*\"(https://github\\.com/n3ttt/SPE_Control_app/releases/download/[^\"]+\\.exe)\"");
+        Version v = new Version(tag.Groups[1].Value);
+        ver = tag.Groups[1].Value;
+        link = setup.Success ? setup.Groups[1].Value : ReleasesPage;
+        return new Version(v.Major, v.Minor, Math.Max(0, v.Build)) > new Version(cur.Major, cur.Minor, Math.Max(0, cur.Build));
+    }
+
+    public static void Check()
+    {
+        try
+        {
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2 (GitHub needs it)
+            string json;
+            using (WebClient wc = new WebClient())
+            {
+                wc.Headers[HttpRequestHeader.UserAgent] = "ExpertAmpControl/" + CurrentText;
+                wc.Headers[HttpRequestHeader.Accept] = "application/vnd.github+json";
+                wc.Encoding = Encoding.UTF8;
+                json = wc.DownloadString(Settings.Betas ? ApiAll : Api);
+            }
+            string ver, link;
+            bool newer = Parse(json, Settings.Betas, Current, out ver, out link);
+            lock (gate)
+            {
+                latest = newer ? ver : null;
+                url = newer ? link : null;
+                error = null;
+                checkedAt = DateTime.Now;
+            }
+        }
+        catch (Exception ex)
+        {
+            lock (gate) { error = ex.Message; checkedAt = DateTime.Now; }   // offline etc.: try again next time
+        }
+    }
+}
+
 class WebServer
 {
     readonly AmpLink amp;
@@ -752,6 +850,9 @@ class WebServer
               .Append(",\"app\":").Append(J(app))
               .Append(",\"age\":").Append(Math.Round(Math.Min(rage, 9999), 1).ToString(ic)).Append('}');
         else sb.Append(",\"radio\":null");
+        string updLink, upd = Updater.Available(out updLink);
+        sb.Append(",\"version\":").Append(J(Updater.CurrentText));
+        if (upd != null) sb.Append(",\"update\":{\"version\":").Append(J(upd)).Append(",\"url\":").Append(J(updLink)).Append('}');
         sb.Append(",\"urls\":[");
         List<string> u = Urls;
         for (int i = 0; i < u.Count; i++) { if (i > 0) sb.Append(','); sb.Append(J(u[i])); }
@@ -789,7 +890,9 @@ class TrayContext : ApplicationContext
     readonly AmpLink amp;
     readonly WebServer web;
     readonly NotifyIcon icon;
-    readonly ToolStripMenuItem statusItem, addrItem, portMenu, startupItem, followItem;
+    readonly ToolStripMenuItem statusItem, addrItem, portMenu, startupItem, followItem, updateItem;
+    string notifiedVersion;
+    bool balloonIsUpdate, manualCheck;
     readonly System.Windows.Forms.Timer timer;
 
     public TrayContext(AmpLink amp, WebServer web, bool startup)
@@ -830,6 +933,17 @@ class TrayContext : ApplicationContext
         menu.Opening += delegate { followItem.Checked = Settings.Follow; };
         menu.Items.Add(startupItem);
         menu.Items.Add(new ToolStripSeparator());
+        updateItem = new ToolStripMenuItem("Check for updates (version " + Updater.CurrentText + ")", null, delegate { UpdateClicked(); });
+        menu.Items.Add(updateItem);
+        ToolStripMenuItem betaItem = new ToolStripMenuItem("Include beta versions in updates");
+        betaItem.Click += delegate
+        {
+            Settings.Betas = !Settings.Betas; Settings.Save();
+            betaItem.Checked = Settings.Betas;
+            UpdateClicked();
+        };
+        betaItem.Checked = Settings.Betas;
+        menu.Items.Add(betaItem);
         menu.Items.Add(new ToolStripMenuItem("Exit", null, delegate { ExitApp(); }));
 
         icon = new NotifyIcon();
@@ -838,6 +952,7 @@ class TrayContext : ApplicationContext
         icon.ContextMenuStrip = menu;
         icon.Visible = true;
         icon.DoubleClick += delegate { OpenPanel(); };
+        icon.BalloonTipClicked += delegate { if (balloonIsUpdate) OpenUpdate(); };
 
         timer = new System.Windows.Forms.Timer();
         timer.Interval = 1000;
@@ -846,6 +961,7 @@ class TrayContext : ApplicationContext
         UpdateStatus();
 
         if (!startup) OpenPanel();
+        balloonIsUpdate = false;
         icon.ShowBalloonTip(5000, Program.DisplayName + " is running",
             "Double-click this icon to open the control panel. Right-click for phone/tablet setup.", ToolTipIcon.Info);
     }
@@ -857,6 +973,49 @@ class TrayContext : ApplicationContext
         statusItem.Text = (age < 3 ? "Amplifier: connected" : "Amplifier: ") + (age < 3 ? (p != null ? " (" + p + ")" : "") : Shorten(st));
         string tip = Program.DisplayName + " - " + (age < 3 ? "amp connected" : "amp not connected");
         icon.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
+        CheckUpdateNotice();
+    }
+
+    // Called every second on the UI thread; the check itself runs in the background.
+    void CheckUpdateNotice()
+    {
+        string link, v = Updater.Available(out link);
+        if (v != null)
+        {
+            if (notifiedVersion != v)
+            {
+                updateItem.Text = "Download update " + v + " (you have " + Updater.CurrentText + ")";
+                updateItem.Font = new Font(updateItem.Font, FontStyle.Bold);
+                notifiedVersion = v; manualCheck = false;
+                balloonIsUpdate = true;
+                icon.ShowBalloonTip(15000, "Update available: " + Program.DisplayName + " " + v,
+                    "Click here to download it, then run it to update. Your settings are kept.", ToolTipIcon.Info);
+            }
+        }
+        else if (manualCheck && Updater.CheckedAt > manualCheckAt)
+        {
+            manualCheck = false;
+            string err = Updater.LastError;
+            balloonIsUpdate = false;
+            icon.ShowBalloonTip(5000, Program.DisplayName,
+                err == null ? "You have the latest version (" + Updater.CurrentText + ")." : "Couldn't check for updates: " + err, ToolTipIcon.Info);
+        }
+    }
+
+    DateTime manualCheckAt;
+    void UpdateClicked()
+    {
+        string link;
+        if (Updater.Available(out link) != null) { OpenUpdate(); return; }
+        manualCheck = true; manualCheckAt = DateTime.Now;
+        ThreadPool.QueueUserWorkItem(delegate { Updater.Check(); });
+    }
+
+    void OpenUpdate()
+    {
+        string link;
+        Updater.Available(out link);
+        Program.OpenBrowser(link ?? Updater.ReleasesPage);
     }
 
     static string Shorten(string s) { return s.Length > 70 ? s.Substring(0, 67) + "..." : s; }

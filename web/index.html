@@ -213,6 +213,7 @@
   <h1>Expert Amp Control</h1>
   <span class="pill"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></span>
   <span class="pill" id="modelPill" title="Model reported by the amplifier">Model: —</span>
+  <a class="pill hidden" id="updPill" target="_blank" rel="noopener" style="color:var(--warn);border-color:#6b5320;text-decoration:none" title="Download the new version, then run it to update. Settings are kept."></a>
   <span class="pill hidden" id="lanPill" title="Type this into the browser on a phone or tablet on the same Wi-Fi">📱 Phones &amp; tablets: <b id="lanUrl" style="color:var(--text);user-select:all"></b></span>
   <span class="sp"></span>
   <label class="pill local-only" title="USB is normally 115200">Baud
@@ -821,6 +822,9 @@ function onServerInfo(j){
     (j.follow && fresh && !r.band ? "Radio is outside the amp's bands" : "");
   following = !!(j.follow && fresh && r.band);
   const here = location.hostname==="localhost"||location.hostname==="127.0.0.1";
+  const up=$("updPill");
+  if(here && j.update && /^https:\/\/github\.com\//.test(j.update.url)){ up.textContent="⬇ Update "+j.update.version+" available"; up.href=j.update.url; up.classList.remove("hidden"); }
+  else up.classList.add("hidden");
   if(here && j.urls && j.urls.length){ $("lanPill").classList.remove("hidden"); $("lanUrl").textContent=j.urls[0].replace(/\/$/,""); }
 }
 (async()=>{
