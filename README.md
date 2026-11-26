@@ -15,6 +15,15 @@ A gauge icon appears by the clock in the taskbar's notification area.
 - **Double-click it** to open the panel.
 - **Right-click it** to see the address phones and tablets should use, choose the USB port by hand, or turn "start with Windows" on or off.
 
+## Mini panel
+
+For when the full panel takes too much screen next to the logger. Right-click the tray icon, choose **Open mini panel**, then:
+
+- **Tall strip**: a narrow column to sit beside the logger.
+- **Wide bar**: a short bar to sit above or below it.
+
+Both show Operate/Standby, TX, output with peak, SWR, temperature, band, power level and the current warning. The ⇅ button switches between the two, and ⤢ opens the full panel. It opens in a small Edge window with no address bar. Windows can't keep a browser window always on top, so park it where the logger doesn't cover it. Any browser can open it too: add `?mini=strip` or `?mini=bar` to the panel address.
+
 ## Phones and tablets
 
 Connect to the same Wi-Fi as the computer, open the browser and type the address shown, for example `http://192.168.1.188:8080`. "Add to Home Screen" makes it behave like an app. This works on iPad and iPhone too.

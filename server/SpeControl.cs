@@ -799,6 +799,10 @@ class TrayContext : ApplicationContext
         ToolStripMenuItem open = new ToolStripMenuItem("Open control panel", null, delegate { OpenPanel(); });
         open.Font = new Font(open.Font, FontStyle.Bold);
         menu.Items.Add(open);
+        ToolStripMenuItem mini = new ToolStripMenuItem("Open mini panel");
+        mini.DropDownItems.Add(new ToolStripMenuItem("Tall strip (beside the logger)", null, delegate { OpenMini("strip"); }));
+        mini.DropDownItems.Add(new ToolStripMenuItem("Wide bar (above or below the logger)", null, delegate { OpenMini("bar"); }));
+        menu.Items.Add(mini);
         addrItem = new ToolStripMenuItem("Use on a phone or tablet...", null, delegate { ShowAddress(); });
         menu.Items.Add(addrItem);
         menu.Items.Add(new ToolStripSeparator());
@@ -879,6 +883,16 @@ class TrayContext : ApplicationContext
     }
 
     void OpenPanel() { Program.OpenBrowser("http://localhost:" + Settings.HttpPort + "/"); }
+
+    // Opens the compact panel in its own small window (Edge "app" window: no tabs or address bar).
+    // Falls back to the default browser if Edge isn't found.
+    void OpenMini(string layout)
+    {
+        string url = "http://localhost:" + Settings.HttpPort + "/?mini=" + layout;
+        string size = layout == "bar" ? "960,130" : "300,440";
+        try { Process.Start("msedge", "--app=" + url + " --window-size=" + size); }
+        catch { Program.OpenBrowser(url); }
+    }
 
     void ShowAddress()
     {
