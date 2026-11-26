@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#0f1216">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="SPE Control">
-<title>Expert 1.5K-FA Control Panel</title>
+<meta name="apple-mobile-web-app-title" content="Expert Amp">
+<title>Expert Amp Control</title>
 <style>
   :root{
     --bg:#0f1216; --panel:#171b21; --panel2:#1e232b; --line:#2a313b; --text:#e6e9ee; --muted:#8b95a3;
@@ -116,13 +116,104 @@
   .server-mode .local-only, .server-mode #welcome{display:none!important}
   @media (max-width:600px){ header{padding:10px 12px} main{padding:10px;gap:10px} .opbtn{flex:1 1 100%} .txbox{flex:1 1 40%} .keys{grid-template-columns:repeat(3,1fr)} }
   .disabled-ui{opacity:.45;pointer-events:none}
+
+  /* ---------- Mini panel (?mini=strip | ?mini=bar) ---------- */
+  #mini{display:none}
+  body.mini-mode{overflow:hidden;font-size:13px}
+  body.mini-mode > header, body.mini-mode > main{display:none!important}
+  body.mini-mode #mini{display:grid;gap:6px;padding:8px;box-sizing:border-box;min-height:100vh}
+  #mini.disabled-ui{opacity:1;pointer-events:auto}
+  #mini.disabled-ui > :not(.m-head){opacity:.45;pointer-events:none}
+  #mini .m-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
+  #mini .m-k{font-size:12px;color:var(--muted);white-space:nowrap}
+  #mini .m-row{display:flex;align-items:baseline;gap:5px}
+  #mini .m-row .sp{flex:1}
+  #mini .m-v{font-size:18px;font-weight:600;line-height:1.1;white-space:nowrap}
+  #mini .bar{height:7px}
+  #mini .m-head{grid-area:head;display:flex;align-items:center;gap:6px;min-width:0}
+  #mini .m-head .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mini .m-head .sp{flex:1}
+  #mini .m-icon{width:28px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);border-radius:6px}
+  #mini .m-op{grid-area:op;border-radius:8px;border-width:2px;font-size:17px;font-weight:700;letter-spacing:.5px;padding:0;min-height:44px}
+  #mini .m-op.operate{border-color:var(--ok);background:rgba(47,196,107,.14);color:var(--ok)}
+  #mini .m-op.standby{color:var(--warn)}
+  #mini .m-tx{grid-area:tx;border-radius:8px;border:2px solid var(--line);background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;letter-spacing:2px;color:#3b434e}
+  #mini .m-tx.tx{border-color:var(--tx);background:rgba(255,90,79,.16);color:var(--tx)}
+  #mini .m-pwr{grid-area:pwr}
+  #mini .m-pwr .m-v{font-size:24px;font-weight:700}
+  #mini .m-pk b{color:var(--text);font-weight:600}
+  .pk{position:relative}
+  .pk > b{position:absolute;top:-4px;width:2px;height:20px;background:var(--text);left:0;opacity:0;transition:left .2s}
+  #mini .pk > b{height:15px}
+  .meter .row .pkv{margin-left:auto;margin-right:12px;font-size:12px}
+  #mini .m-swr{grid-area:swr} #mini .m-temp{grid-area:temp}
+  #mini .m-band{grid-area:band;flex-direction:row;align-items:center;gap:6px;padding:4px 6px}
+  #mini .m-band button{width:40px;align-self:stretch;padding:0;font-size:18px}
+  #mini .m-band .mid{flex:1;text-align:center;min-width:0}
+  #mini .m-band .m-v{font-size:20px;font-weight:700}
+  #mini .m-band .m-k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mini .m-band .m-k.follow{color:var(--accent)}
+  #mini .m-lvl{grid-area:lvl;display:grid;gap:4px}
+  #mini .m-lvl button{padding:0;font-weight:600;font-size:12px;min-height:30px}
+  #mini .m-lvl button.sel{background:var(--accent);border-color:var(--accent);color:#04121f}
+  #mini .m-alert{grid-area:alert;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);min-width:0}
+  #mini .m-alert b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mini .m-alert span{font-size:12px;color:var(--muted)}
+  #mini .m-alert.w{border-color:#6b5320;background:rgba(242,178,51,.10)} #mini .m-alert.w b{color:var(--warn)}
+  #mini .m-alert.a{border-color:#6b2626;background:rgba(239,75,75,.14)} #mini .m-alert.a b{color:var(--bad)}
+  #mini .m-alert.ok{border-color:#1f5536;background:rgba(47,196,107,.07)}
+  #mini .m-foot{grid-area:foot;font-size:11px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Tall strip: sits beside the logger */
+  #mini.strip{grid-template-columns:repeat(6,minmax(0,1fr));align-content:start;
+    grid-template-areas:"head head head head head head" "op op op op tx tx" "pwr pwr pwr pwr pwr pwr" "swr swr swr temp temp temp" "band band band band band band" "lvl lvl lvl lvl lvl lvl" "alert alert alert alert alert alert" "foot foot foot foot foot foot"}
+  #mini.strip .m-op,#mini.strip .m-tx{height:48px}
+  #mini.strip .m-band{height:52px}
+  #mini.strip .m-lvl{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #mini.strip .m-lvl button{height:34px}
+  /* Wide bar: sits above or below the logger */
+  #mini.bar{grid-template-columns:110px 50px minmax(150px,200px) 112px 92px minmax(140px,170px) 40px minmax(0,1fr) 32px;
+    grid-template-areas:"op tx pwr swr temp band lvl alert head";height:100vh;min-height:0;align-items:stretch}
+  #mini.bar .m-head{flex-direction:column;justify-content:center;gap:4px}
+  #mini.bar .m-head .name,#mini.bar .m-head .sp,#mini.bar .m-head .dot,#mini.bar .m-foot,#mini.bar .m-alert span{display:none}
+  #mini.bar .m-head .m-icon{width:32px;flex:1}
+  #mini.bar .m-pwr .m-v{font-size:20px}
+  #mini.bar .m-pwr > .m-row > .m-k:first-child{display:none}
+  #mini.bar .m-lvl{grid-template-rows:repeat(3,minmax(0,1fr))}
+  #mini.bar .m-lvl button{min-height:0;font-size:11px}
+  #mini.bar .m-band .m-v{font-size:18px}
+  #mini.bar .m-band button{width:28px}
 </style>
 </head>
 <body>
+<!-- Mini panel: shown instead of the full panel when the page is opened with ?mini=strip or ?mini=bar -->
+<div id="mini" class="strip disabled-ui">
+  <div class="m-head">
+    <span class="dot" id="mDot"></span><span class="name" id="mName">SPE Expert</span><span class="sp"></span>
+    <button class="m-icon" id="mLayout" title="Switch layout" aria-label="Switch layout"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16"/><path d="M3 8l4-4 4 4"/><path d="M17 20V4"/><path d="M13 16l4 4 4-4"/></svg></button>
+    <button class="m-icon" id="mFull" title="Open the full panel" aria-label="Open the full panel"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
+  </div>
+  <button class="m-op standby" id="mOp" title="Toggle Operate / Standby  (O)">STANDBY</button>
+  <div class="m-tx" id="mTx">TX</div>
+  <div class="m-card m-pwr">
+    <div class="m-row"><span class="m-k">Output</span><span class="sp"></span><span class="m-k m-pk" title="Peak output, held for 10 seconds">Peak <b id="mPwrPk">0</b></span><span class="sp"></span><span class="m-v" id="mPwr">0</span><span class="m-k">W</span></div>
+    <div class="pk"><div class="bar"><i id="mPwrBar"></i></div><b id="mPeakTick"></b></div>
+  </div>
+  <div class="m-card m-swr"><div class="m-row"><span class="m-k" title="Highest SWR, held for 10 seconds">SWR peak</span><span class="sp"></span><span class="m-v" id="mSwr">—</span></div><div class="pk"><div class="bar"><i id="mSwrBar"></i></div><b id="mSwrTick"></b></div></div>
+  <div class="m-card m-temp"><div class="m-row"><span class="m-k">Temp</span><span class="sp"></span><span class="m-v" id="mTemp">—</span></div><div class="bar"><i id="mTempBar"></i></div></div>
+  <div class="m-card m-band">
+    <button id="mBandDn" title="Band down (←)" aria-label="Band down">‹</button>
+    <div class="mid"><div class="m-v" id="mBand">—</div><div class="m-k" id="mBandSub"></div></div>
+    <button id="mBandUp" title="Band up (→)" aria-label="Band up">›</button>
+  </div>
+  <div class="m-lvl" id="mLvl"><button data-l="L" title="Low">LOW</button><button data-l="M" title="Mid">MID</button><button data-l="H" title="High">HIGH</button></div>
+  <div class="m-alert ok" id="mAlert"><div style="min-width:0"><b>No warnings</b></div></div>
+  <div class="m-foot" id="mFoot"></div>
+</div>
 <header>
-  <h1>Expert 1.5K-FA Control</h1>
+  <h1>Expert Amp Control</h1>
   <span class="pill"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></span>
   <span class="pill" id="modelPill" title="Model reported by the amplifier">Model: —</span>
+  <a class="pill hidden" id="updPill" target="_blank" rel="noopener" style="color:var(--warn);border-color:#6b5320;text-decoration:none" title="Download the new version, then run it to update. Settings are kept."></a>
   <span class="pill hidden" id="lanPill" title="Type this into the browser on a phone or tablet on the same Wi-Fi">📱 Phones &amp; tablets: <b id="lanUrl" style="color:var(--text);user-select:all"></b></span>
   <span class="sp"></span>
   <label class="pill local-only" title="USB is normally 115200">Baud
@@ -170,7 +261,7 @@
         <text x="200" y="128" fill="#5d6673" font-size="9" text-anchor="middle" id="pwrMaxLbl">1500</text>
       </svg>
       <div class="val"><span id="pwrVal">0</span><small> W</small></div>
-      <div class="peak">Peak (3 s hold): <span id="peakVal">0</span> W</div>
+      <div class="peak">Peak (10 s hold): <span id="peakVal">0</span> W</div>
     </div>
   </section>
 
@@ -178,13 +269,13 @@
   <section class="card c4">
     <h2>SWR &amp; amplifier</h2>
     <div class="meter">
-      <div class="row"><span>SWR at antenna</span><b id="swrAntVal">—</b></div>
-      <div class="bar"><i id="swrAntBar"></i></div>
+      <div class="row"><span>SWR at antenna</span><span class="pkv">Peak <span id="swrAntPk">—</span></span><b id="swrAntVal">—</b></div>
+      <div class="pk"><div class="bar"><i id="swrAntBar"></i></div><b id="swrAntTick"></b></div>
       <div class="ticks"><span>1.0</span><span>1.5</span><span>2.0</span><span>2.5</span><span>3.0+</span></div>
     </div>
     <div class="meter">
-      <div class="row"><span>SWR at ATU (what the amp sees)</span><b id="swrAtuVal">—</b></div>
-      <div class="bar"><i id="swrAtuBar"></i></div>
+      <div class="row"><span>SWR at ATU (what the amp sees)</span><span class="pkv">Peak <span id="swrAtuPk">—</span></span><b id="swrAtuVal">—</b></div>
+      <div class="pk"><div class="bar"><i id="swrAtuBar"></i></div><b id="swrAtuTick"></b></div>
     </div>
     <div class="mini">
       <div class="kv"><div class="k">PA voltage</div><div class="v" id="vpaVal">—</div></div>
@@ -261,7 +352,7 @@
 
 <div class="overlay" id="welcome">
   <div class="box">
-    <h3>Connect your Expert 1.5K-FA</h3>
+    <h3>Connect your SPE Expert</h3>
     <p>Plug the amplifier in by USB and click <b>Connect amplifier</b>, then choose its COM port (usually “USB Serial Port”). This page needs Chrome or Edge.</p>
     <p>Want to look around first? <b>Demo mode</b> runs a simulated amplifier.</p>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
@@ -426,7 +517,7 @@ class DemoLink {
 /* ---------- App state ---------- */
 const $ = id => document.getElementById(id);
 let link=null, st=null, lastFrameAt=0, pollTimer=null, noReplyWarned=false;
-let peak=0, peakAt=0, target={band:null,level:null,presses:0,last:0,started:0};
+let peak=0, peakAt=0, swrPk={ant:{v:0,at:0},atu:{v:0,at:0}}, target={band:null,level:null,presses:0,last:0,started:0};
 const hist=[]; // {t,p,swr,temp}
 
 function log(msg, bad=false){
@@ -442,6 +533,7 @@ function setConn(kind,text){
   $("connDot").className="dot"+(kind?" "+kind:"");
   $("connText").textContent=text;
   $("ui").classList.toggle("disabled-ui",!kind);
+  $("mini").classList.toggle("disabled-ui",!kind); $("mDot").className="dot"+(kind?" "+kind:"");
   $("btnConnect").textContent = kind ? "Disconnect" : "Connect amplifier";
   $("btnConnect").classList.toggle("primary",!kind);
   $("btnDemo").disabled = !!kind;
@@ -489,6 +581,9 @@ function onFrame(text){
 }
 const bandName = c => (BANDS.find(b=>b[0]===c)||[0,"?"])[1];
 const levelName = l => ({L:"Low",M:"Mid",H:"High"})[l]||l;
+/* Model id in the status frame is e.g. "13K", "15K", "20K": rated output in hundreds of watts */
+function maxPower(){ const k=st&&parseInt(st.id,10); return k>=5&&k<=40 ? k*100 : 1500; }
+function modelName(){ const k=st&&parseInt(st.id,10); return k>=5&&k<=40 ? "Expert "+(k/10).toFixed(1).replace(/\.0$/,"")+"K-FA" : ""; }
 
 function diffLog(a,b){
   if(a.operate!==b.operate) log(b.operate?"Switched to OPERATE.":"Switched to STANDBY.");
@@ -524,6 +619,15 @@ function driveTargets(){
 function setTarget(kind,val){ target[kind]=val; target.presses=0; target.started=Date.now(); target.last=0; render(); }
 
 /* ---------- Rendering ---------- */
+/* SWR peak hold: the highest reading is held for 10 s, then follows the live reading again (or clears after unkey). */
+const PEAK_HOLD_MS=10000, SWR_HOLD_MS=PEAK_HOLD_MS;  // output and SWR peaks both hold 10 s
+function holdSwr(p,v,tx,now){
+  const live=tx&&v>0;
+  if(live&&(v>=p.v||now-p.at>SWR_HOLD_MS)){ p.v=v; p.at=now; }
+  else if(!live&&now-p.at>SWR_HOLD_MS) p.v=0;
+  return p.v;
+}
+const swrPct = v => (v-1)/2*100;
 function swrColor(v){ return v<1.5?"var(--ok)":v<2?"var(--warn)":"var(--bad)"; }
 function setBar(id,pct,color){ const e=$(id); e.style.width=Math.max(0,Math.min(100,pct))+"%"; e.style.background=color; }
 
@@ -542,8 +646,9 @@ function render(){
   $("bankText").textContent="Bank "+s.bank;
   document.querySelectorAll("#lvlSeg button").forEach(b=>{ b.classList.toggle("sel",b.dataset.l===s.level); });
   // Power gauge
-  const max = 1500;
-  if(s.pout>=peak || now-peakAt>3000){ peak=s.pout; peakAt=now; }
+  const max = maxPower();
+  $("pwrMaxLbl").textContent=max;
+  if(s.pout>=peak || now-peakAt>PEAK_HOLD_MS){ peak=s.pout; peakAt=now; }
   $("pwrVal").textContent=s.pout;
   $("peakVal").textContent=peak;
   const pct=Math.min(100,s.pout/max*100);
@@ -552,9 +657,14 @@ function render(){
   $("pwrArc").setAttribute("stroke", s.pout>max*0.97?"var(--bad)":"var(--accent)");
   $("peakTick").setAttribute("transform",`rotate(${-90+Math.min(180,peak/max*180)} 110 115)`);
   // SWR
-  const sw=(v,idV,idB)=>{ if(!s.tx||v<=0){ $(idV).textContent="—"; setBar(idB,0,"var(--ok)"); return; }
-    $(idV).textContent=v.toFixed(2)+" : 1"; $(idV).style.color=swrColor(v); setBar(idB,(v-1)/2*100,swrColor(v)); };
-  sw(s.swrAnt,"swrAntVal","swrAntBar"); sw(s.swrAtu,"swrAtuVal","swrAtuBar");
+  holdSwr(swrPk.ant,s.swrAnt,s.tx,now); holdSwr(swrPk.atu,s.swrAtu,s.tx,now);
+  const sw=(v,pk,idV,idB,idP,idT)=>{
+    if(pk>0){ $(idP).textContent=pk.toFixed(2); $(idP).style.color=swrColor(pk); $(idT).style.left=Math.max(0,Math.min(100,swrPct(pk)))+"%"; $(idT).style.opacity=.85; }
+    else { $(idP).textContent="—"; $(idP).style.color=""; $(idT).style.opacity=0; }
+    if(!s.tx||v<=0){ $(idV).textContent="—"; $(idV).style.color=""; setBar(idB,0,"var(--ok)"); return; }
+    $(idV).textContent=v.toFixed(2)+" : 1"; $(idV).style.color=swrColor(v); setBar(idB,swrPct(v),swrColor(v)); };
+  sw(s.swrAnt,swrPk.ant.v,"swrAntVal","swrAntBar","swrAntPk","swrAntTick");
+  sw(s.swrAtu,swrPk.atu.v,"swrAtuVal","swrAtuBar","swrAtuPk","swrAtuTick");
   $("vpaVal").textContent=s.vpa.toFixed(1)+" V";
   $("ipaVal").textContent=s.ipa.toFixed(1)+" A";
   // Temperature
@@ -589,6 +699,47 @@ function render(){
   // History
   hist.push({t:now,p:s.pout,swr:s.tx?s.swrAnt:0,temp:t});
   while(hist.length && now-hist[0].t>120000) hist.shift();
+  if(MINI) renderMini(s,max,t);
+}
+
+/* ---------- Mini panel ---------- */
+function renderMini(s,max,t){
+  $("mName").textContent=modelName()||("Expert "+s.id);
+  const op=$("mOp"); op.className="m-op "+(s.operate?"operate":"standby"); op.textContent=s.operate?"OPERATE":"STANDBY";
+  $("mTx").classList.toggle("tx",s.tx);
+  $("mPwr").textContent=s.pout;
+  setBar("mPwrBar",s.pout/max*100, s.pout>max*0.97?"var(--bad)":"var(--accent)");
+  $("mPeakTick").style.left=Math.min(100,peak/max*100)+"%";
+  $("mPeakTick").style.opacity=peak>0?.85:0;
+  $("mPwrPk").textContent=peak;
+  const pk=swrPk.ant.v;
+  if(pk>0){ $("mSwr").textContent=pk.toFixed(2); $("mSwr").style.color=swrColor(pk); $("mSwrTick").style.left=Math.max(0,Math.min(100,swrPct(pk)))+"%"; $("mSwrTick").style.opacity=.85; }
+  else { $("mSwr").textContent="—"; $("mSwr").style.color=""; $("mSwrTick").style.opacity=0; }
+  if(s.tx && s.swrAnt>0) setBar("mSwrBar",swrPct(s.swrAnt),swrColor(s.swrAnt)); else setBar("mSwrBar",0,"var(--ok)");
+  const tc=t<55?"var(--ok)":t<70?"var(--warn)":"var(--bad)";
+  $("mTemp").textContent=t+" °C"; $("mTemp").style.color=t<55?"":tc; setBar("mTempBar",(t-20)/60*100,tc);
+  const pending=target.band!==null;
+  $("mBand").textContent=pending?bandName(target.band)+"…":bandName(s.band);
+  const sub=$("mBandSub");
+  if(following){ sub.textContent=MINI==="bar"?"Follows radio":"Following radio"+(radioText?" · "+radioText:""); sub.className="m-k follow"; }
+  else { sub.textContent=s.tx?(MINI==="bar"?"Locked (TX)":"Locked while transmitting"):(radioText||""); sub.className="m-k"; }
+  const lock=s.tx||following, bi=bandIdx(s.band);
+  $("mBandDn").disabled=lock||bi<=0; $("mBandUp").disabled=lock||bi<0||bi>=BANDS.length-1;
+  document.querySelectorAll("#mLvl button").forEach(b=>b.classList.toggle("sel",b.dataset.l===(target.level||s.level)));
+  let cls="ok", title="No warnings", detail="";
+  if(s.alarm!=="N"){ const a=ALARM[s.alarm]||["Alarm code "+s.alarm,"See the amplifier manual."]; cls="a"; title=a[0]; detail=a[1]; }
+  else if(s.warn!=="N"){ const w=WARN[s.warn]||["Warning code "+s.warn,"See the amplifier manual."]; cls="w"; title=w[0]; detail=w[1]; }
+  const al=$("mAlert"); al.className="m-alert "+cls;
+  al.firstElementChild.innerHTML=""; const b=document.createElement("b"); b.textContent=title; al.firstElementChild.appendChild(b);
+  if(detail){ const sp=document.createElement("span"); sp.textContent=detail; al.firstElementChild.appendChild(sp); }
+  al.title=detail?title+": "+detail:title;
+  $("mFoot").textContent=[$("txAntVal").textContent, "Input "+s.input, "ATU "+$("atuVal").textContent.toLowerCase()].join(" · ");
+}
+function setMiniLayout(l){
+  MINI=l==="bar"?"bar":"strip";
+  $("mini").className=MINI+($("ui").classList.contains("disabled-ui")?" disabled-ui":"");
+  $("mLayout").title=$("mLayout").ariaLabel=MINI==="bar"?"Switch to tall strip":"Switch to wide bar";
+  const u=new URL(location.href); u.searchParams.set("mini",MINI); history.replaceState(null,"",u);
 }
 
 function drawHist(){
@@ -603,7 +754,7 @@ function drawHist(){
     g.strokeStyle=color; g.lineWidth=1.6*devicePixelRatio; g.stroke();
     if(fill){ g.lineTo(x(hist[hist.length-1].t),H); g.lineTo(x(hist[0].t),H); g.closePath(); g.fillStyle=fill; g.fill(); }
   };
-  line("p",1500,"#3aa0ff","rgba(58,160,255,.15)");
+  line("p",maxPower(),"#3aa0ff","rgba(58,160,255,.15)");
   line("swr",3,"#f2b233");
   line("temp",90,"#c37bff");
 }
@@ -625,15 +776,34 @@ const demo=()=>start(new DemoLink(onFrame),"Demo mode (simulated amp)","demo");
 $("btnDemo").onclick=demo; $("wDemo").onclick=demo;
 const sb=localStorage.getItem("expBaud"); if(sb) $("baud").value=sb;
 
+let MINI=null;
+{
+  const m=new URLSearchParams(location.search).get("mini");
+  if(m!==null){ document.body.classList.add("mini-mode"); setMiniLayout(m); }
+}
+$("mOp").onclick=()=>send(CMD.OPERATE);
+$("mBandDn").onclick=()=>{ if(st && !st.tx && !following){ const i=bandIdx(st.band); if(i>0) setTarget("band",BANDS[i-1][0]); } };
+$("mBandUp").onclick=()=>{ if(st && !st.tx && !following){ const i=bandIdx(st.band); if(i>=0&&i<BANDS.length-1) setTarget("band",BANDS[i+1][0]); } };
+document.querySelectorAll("#mLvl button").forEach(b=>b.onclick=()=>{ if(st && st.level!==b.dataset.l) setTarget("level",b.dataset.l); });
+$("mLayout").onclick=()=>{
+  setMiniLayout(MINI==="bar"?"strip":"bar");
+  // Works in the app window the tray opens; ordinary browser tabs ignore it.
+  try{ MINI==="bar" ? window.resizeTo(1000,130) : window.resizeTo(300,440); }catch(e){}
+  render();
+};
+$("mFull").onclick=()=>{ const u=new URL(location.href); u.searchParams.delete("mini"); window.open(u.toString(),"_blank"); };
+
 /* Server mode: when this page is opened from the SPE Control app, connect automatically. */
-let lastServerState="", following=false;
+let lastServerState="", following=false, radioText="";
 $("followChk").onchange=e=>fetch("/api/follow?on="+(e.target.checked?1:0),{method:"POST"});
 function onServerInfo(j){
-  if(!j){ setConn(null,"Lost contact with the SPE Control computer"); $("ui").classList.add("disabled-ui"); return; }
+  if(!j){ setConn(null,"Lost contact with the Expert Amp Control computer"); $("ui").classList.add("disabled-ui"); $("mini").classList.add("disabled-ui"); return; }
   const live = j.frame && j.age<3;
   $("connDot").className="dot"+(live?" on":"");
   $("connText").textContent = live ? "Amplifier connected" : j.state;
   $("ui").classList.toggle("disabled-ui",!live);
+  $("mini").classList.toggle("disabled-ui",!live); $("mDot").className="dot"+(live?" on":"");
+  if(MINI) $("mName").title=live?"Amplifier connected":j.state;
   if(j.state!==lastServerState){ lastServerState=j.state; log(j.state, !live); }
   // Radio from the logger (TTTLog / N1MM RadioInfo)
   $("radioKv").classList.remove("hidden");
@@ -641,9 +811,10 @@ function onServerInfo(j){
   if(document.activeElement!==$("followChk")) $("followChk").checked=!!j.follow;
   if(fresh){
     $("radioFreq").textContent=(r.khz/1000).toFixed(3)+" MHz "+(r.mode||"");
+    radioText=(r.khz/1000).toFixed(3)+(r.mode?" "+r.mode:"");
     $("radioFrom").textContent=r.app?"("+r.app+")":"";
   } else {
-    $("radioFreq").textContent="No radio info";
+    $("radioFreq").textContent="No radio info"; radioText="";
     $("radioFrom").textContent="";
   }
   $("followNote").textContent = j.radioError || j.followNote ||
@@ -651,6 +822,9 @@ function onServerInfo(j){
     (j.follow && fresh && !r.band ? "Radio is outside the amp's bands" : "");
   following = !!(j.follow && fresh && r.band);
   const here = location.hostname==="localhost"||location.hostname==="127.0.0.1";
+  const up=$("updPill");
+  if(here && j.update && /^https:\/\/github\.com\//.test(j.update.url)){ up.textContent="⬇ Update "+j.update.version+" available"; up.href=j.update.url; up.classList.remove("hidden"); }
+  else up.classList.add("hidden");
   if(here && j.urls && j.urls.length){ $("lanPill").classList.remove("hidden"); $("lanUrl").textContent=j.urls[0].replace(/\/$/,""); }
 }
 (async()=>{
@@ -659,7 +833,7 @@ function onServerInfo(j){
     const r=await fetch("/api/status",{cache:"no-store"}); const j=await r.json();
     if(!j.server) return;
     document.body.classList.add("server-mode");
-    start(new ServerLink(onFrame,onServerInfo),"Using SPE Control on "+location.host,"on");
+    start(new ServerLink(onFrame,onServerInfo),"Using Expert Amp Control on "+location.host,"on");
     $("ui").classList.add("disabled-ui");
   }catch(e){}
 })();

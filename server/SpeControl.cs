@@ -18,14 +18,16 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("SPE Control")]
-[assembly: AssemblyProduct("SPE Control")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyTitle("Expert Amp Control")]
+[assembly: AssemblyProduct("Expert Amp Control")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 static class Program
 {
+    // AppName is the internal id (startup registry value, settings folder): keep it so upgrades still work.
     public const string AppName = "SPE Control";
+    public const string DisplayName = "Expert Amp Control";
     public const string MutexName = "SPEControlPanelServer";
 
     [STAThread]
@@ -57,12 +59,13 @@ static class Program
         try { web.Start(); }
         catch (Exception ex)
         {
-            MessageBox.Show("SPE Control could not start its web server on port " + Settings.HttpPort +
+            MessageBox.Show("Expert Amp Control could not start its web server on port " + Settings.HttpPort +
                 ".\n\nAnother program may be using that port.\n\n" + ex.Message,
-                AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                DisplayName, MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
 
+        Updater.Start();
         Application.Run(new TrayContext(amp, web, startup));
         GC.KeepAlive(mutex);
     }
@@ -113,6 +116,7 @@ static class Settings
     public static int Baud = 115200;
     public static bool Follow = true;        // amp follows the radio's band (from logger RadioInfo packets)
     public static int RadioPort = 12060;     // N1MM-compatible RadioInfo UDP port
+    public static bool Betas = false;        // also offer pre-release (beta) updates
 
     static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SPE Control"); } }
     static string FilePath { get { return Path.Combine(Dir, "settings.txt"); } }
@@ -133,6 +137,7 @@ static class Settings
                 else if (k == "baud" && int.TryParse(v, out n)) Baud = n;
                 else if (k == "follow") Follow = v != "0" && v.ToLowerInvariant() != "false";
                 else if (k == "radioport" && int.TryParse(v, out n)) RadioPort = n;
+                else if (k == "betas") Betas = v == "1" || v.ToLowerInvariant() == "true";
             }
         }
         catch { }
@@ -144,7 +149,7 @@ static class Settings
         {
             Directory.CreateDirectory(Dir);
             File.WriteAllText(FilePath, "port=" + Port + "\r\nhttpport=" + HttpPort + "\r\nbaud=" + Baud +
-                "\r\nfollow=" + (Follow ? "1" : "0") + "\r\nradioport=" + RadioPort + "\r\n");
+                "\r\nfollow=" + (Follow ? "1" : "0") + "\r\nradioport=" + RadioPort + "\r\nbetas=" + (Betas ? "1" : "0") + "\r\n");
         }
         catch { }
     }
@@ -597,6 +602,101 @@ class RadioListener
 }
 
 // ---------------------------------------------------------------- web server
+// Checks GitHub for a newer release: shortly after start, then once a day.
+// Normally uses releases/latest, which skips drafts and pre-releases; with the
+// "Include beta versions" setting on it looks at the newest release of any kind.
+static class Updater
+{
+    const string Api = "https://api.github.com/repos/n3ttt/SPE_Control_app/releases/latest";
+    const string ApiAll = "https://api.github.com/repos/n3ttt/SPE_Control_app/releases?per_page=10";
+    public const string ReleasesPage = "https://github.com/n3ttt/SPE_Control_app/releases/latest";
+    static readonly object gate = new object();
+    static string latest, url, error;
+    static DateTime checkedAt = DateTime.MinValue;
+
+    public static Version Current { get { return Assembly.GetExecutingAssembly().GetName().Version; } }
+    public static string CurrentText { get { Version v = Current; return v.Major + "." + v.Minor + "." + v.Build; } }
+
+    /// <summary>Newer version available (e.g. "1.3.0") or null, with the page to download it from.</summary>
+    public static string Available(out string link)
+    {
+        lock (gate) { link = url; return latest; }
+    }
+    public static string LastError { get { lock (gate) return error; } }
+    public static DateTime CheckedAt { get { lock (gate) return checkedAt; } }
+
+    public static void Start()
+    {
+        Thread t = new Thread(delegate ()
+        {
+            Thread.Sleep(20000);   // let the amp link and web server settle first
+            while (true)
+            {
+                Check();
+                Thread.Sleep(TimeSpan.FromHours(24));
+            }
+        });
+        t.IsBackground = true;
+        t.Start();
+    }
+
+    /// <summary>Reads a GitHub releases response; true if it holds a version newer than cur.</summary>
+    public static bool Parse(string json, bool betas, Version cur, out string ver, out string link)
+    {
+        if (betas)
+        {
+            // The list is newest first; skip drafts (only visible to the owner anyway) and take the highest version.
+            string best = null; Version bestV = null;
+            foreach (string rel in Regex.Split(json, "\\{\\s*\"url\"\\s*:\\s*\"https://api\\.github\\.com/repos/[^\"]+/releases/\\d+\""))
+            {
+                if (Regex.IsMatch(rel, "\"draft\"\\s*:\\s*true")) continue;
+                Match m = Regex.Match(rel, "\"tag_name\"\\s*:\\s*\"v?(\\d+(?:\\.\\d+){1,3})");
+                if (!m.Success) continue;
+                Version rv = new Version(m.Groups[1].Value);
+                if (bestV == null || rv > bestV) { bestV = rv; best = rel; }
+            }
+            if (best == null) throw new Exception("No releases found.");
+            json = best;
+        }
+        Match tag = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"v?(\\d+(?:\\.\\d+){1,3})");
+        if (!tag.Success) throw new Exception("No version in the latest release.");
+        Match setup = Regex.Match(json, "\"browser_download_url\"\\s*:\\s*\"(https://github\\.com/n3ttt/SPE_Control_app/releases/download/[^\"]+\\.exe)\"");
+        Version v = new Version(tag.Groups[1].Value);
+        ver = tag.Groups[1].Value;
+        link = setup.Success ? setup.Groups[1].Value : ReleasesPage;
+        return new Version(v.Major, v.Minor, Math.Max(0, v.Build)) > new Version(cur.Major, cur.Minor, Math.Max(0, cur.Build));
+    }
+
+    public static void Check()
+    {
+        try
+        {
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2 (GitHub needs it)
+            string json;
+            using (WebClient wc = new WebClient())
+            {
+                wc.Headers[HttpRequestHeader.UserAgent] = "ExpertAmpControl/" + CurrentText;
+                wc.Headers[HttpRequestHeader.Accept] = "application/vnd.github+json";
+                wc.Encoding = Encoding.UTF8;
+                json = wc.DownloadString(Settings.Betas ? ApiAll : Api);
+            }
+            string ver, link;
+            bool newer = Parse(json, Settings.Betas, Current, out ver, out link);
+            lock (gate)
+            {
+                latest = newer ? ver : null;
+                url = newer ? link : null;
+                error = null;
+                checkedAt = DateTime.Now;
+            }
+        }
+        catch (Exception ex)
+        {
+            lock (gate) { error = ex.Message; checkedAt = DateTime.Now; }   // offline etc.: try again next time
+        }
+    }
+}
+
 class WebServer
 {
     readonly AmpLink amp;
@@ -750,6 +850,9 @@ class WebServer
               .Append(",\"app\":").Append(J(app))
               .Append(",\"age\":").Append(Math.Round(Math.Min(rage, 9999), 1).ToString(ic)).Append('}');
         else sb.Append(",\"radio\":null");
+        string updLink, upd = Updater.Available(out updLink);
+        sb.Append(",\"version\":").Append(J(Updater.CurrentText));
+        if (upd != null) sb.Append(",\"update\":{\"version\":").Append(J(upd)).Append(",\"url\":").Append(J(updLink)).Append('}');
         sb.Append(",\"urls\":[");
         List<string> u = Urls;
         for (int i = 0; i < u.Count; i++) { if (i > 0) sb.Append(','); sb.Append(J(u[i])); }
@@ -787,7 +890,9 @@ class TrayContext : ApplicationContext
     readonly AmpLink amp;
     readonly WebServer web;
     readonly NotifyIcon icon;
-    readonly ToolStripMenuItem statusItem, addrItem, portMenu, startupItem, followItem;
+    readonly ToolStripMenuItem statusItem, addrItem, portMenu, startupItem, followItem, updateItem;
+    string notifiedVersion;
+    bool balloonIsUpdate, manualCheck;
     readonly System.Windows.Forms.Timer timer;
 
     public TrayContext(AmpLink amp, WebServer web, bool startup)
@@ -799,6 +904,10 @@ class TrayContext : ApplicationContext
         ToolStripMenuItem open = new ToolStripMenuItem("Open control panel", null, delegate { OpenPanel(); });
         open.Font = new Font(open.Font, FontStyle.Bold);
         menu.Items.Add(open);
+        ToolStripMenuItem mini = new ToolStripMenuItem("Open mini panel");
+        mini.DropDownItems.Add(new ToolStripMenuItem("Tall strip (beside the logger)", null, delegate { OpenMini("strip"); }));
+        mini.DropDownItems.Add(new ToolStripMenuItem("Wide bar (above or below the logger)", null, delegate { OpenMini("bar"); }));
+        menu.Items.Add(mini);
         addrItem = new ToolStripMenuItem("Use on a phone or tablet...", null, delegate { ShowAddress(); });
         menu.Items.Add(addrItem);
         menu.Items.Add(new ToolStripSeparator());
@@ -824,14 +933,26 @@ class TrayContext : ApplicationContext
         menu.Opening += delegate { followItem.Checked = Settings.Follow; };
         menu.Items.Add(startupItem);
         menu.Items.Add(new ToolStripSeparator());
+        updateItem = new ToolStripMenuItem("Check for updates (version " + Updater.CurrentText + ")", null, delegate { UpdateClicked(); });
+        menu.Items.Add(updateItem);
+        ToolStripMenuItem betaItem = new ToolStripMenuItem("Include beta versions in updates");
+        betaItem.Click += delegate
+        {
+            Settings.Betas = !Settings.Betas; Settings.Save();
+            betaItem.Checked = Settings.Betas;
+            UpdateClicked();
+        };
+        betaItem.Checked = Settings.Betas;
+        menu.Items.Add(betaItem);
         menu.Items.Add(new ToolStripMenuItem("Exit", null, delegate { ExitApp(); }));
 
         icon = new NotifyIcon();
         try { icon.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { icon.Icon = SystemIcons.Application; }
-        icon.Text = Program.AppName;
+        icon.Text = Program.DisplayName;
         icon.ContextMenuStrip = menu;
         icon.Visible = true;
         icon.DoubleClick += delegate { OpenPanel(); };
+        icon.BalloonTipClicked += delegate { if (balloonIsUpdate) OpenUpdate(); };
 
         timer = new System.Windows.Forms.Timer();
         timer.Interval = 1000;
@@ -840,7 +961,8 @@ class TrayContext : ApplicationContext
         UpdateStatus();
 
         if (!startup) OpenPanel();
-        icon.ShowBalloonTip(5000, Program.AppName + " is running",
+        balloonIsUpdate = false;
+        icon.ShowBalloonTip(5000, Program.DisplayName + " is running",
             "Double-click this icon to open the control panel. Right-click for phone/tablet setup.", ToolTipIcon.Info);
     }
 
@@ -849,8 +971,51 @@ class TrayContext : ApplicationContext
         string frame, st, p; double age;
         amp.Snapshot(out frame, out age, out st, out p);
         statusItem.Text = (age < 3 ? "Amplifier: connected" : "Amplifier: ") + (age < 3 ? (p != null ? " (" + p + ")" : "") : Shorten(st));
-        string tip = Program.AppName + " - " + (age < 3 ? "amp connected" : "amp not connected");
+        string tip = Program.DisplayName + " - " + (age < 3 ? "amp connected" : "amp not connected");
         icon.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
+        CheckUpdateNotice();
+    }
+
+    // Called every second on the UI thread; the check itself runs in the background.
+    void CheckUpdateNotice()
+    {
+        string link, v = Updater.Available(out link);
+        if (v != null)
+        {
+            if (notifiedVersion != v)
+            {
+                updateItem.Text = "Download update " + v + " (you have " + Updater.CurrentText + ")";
+                updateItem.Font = new Font(updateItem.Font, FontStyle.Bold);
+                notifiedVersion = v; manualCheck = false;
+                balloonIsUpdate = true;
+                icon.ShowBalloonTip(15000, "Update available: " + Program.DisplayName + " " + v,
+                    "Click here to download it, then run it to update. Your settings are kept.", ToolTipIcon.Info);
+            }
+        }
+        else if (manualCheck && Updater.CheckedAt > manualCheckAt)
+        {
+            manualCheck = false;
+            string err = Updater.LastError;
+            balloonIsUpdate = false;
+            icon.ShowBalloonTip(5000, Program.DisplayName,
+                err == null ? "You have the latest version (" + Updater.CurrentText + ")." : "Couldn't check for updates: " + err, ToolTipIcon.Info);
+        }
+    }
+
+    DateTime manualCheckAt;
+    void UpdateClicked()
+    {
+        string link;
+        if (Updater.Available(out link) != null) { OpenUpdate(); return; }
+        manualCheck = true; manualCheckAt = DateTime.Now;
+        ThreadPool.QueueUserWorkItem(delegate { Updater.Check(); });
+    }
+
+    void OpenUpdate()
+    {
+        string link;
+        Updater.Available(out link);
+        Program.OpenBrowser(link ?? Updater.ReleasesPage);
     }
 
     static string Shorten(string s) { return s.Length > 70 ? s.Substring(0, 67) + "..." : s; }
@@ -880,6 +1045,16 @@ class TrayContext : ApplicationContext
 
     void OpenPanel() { Program.OpenBrowser("http://localhost:" + Settings.HttpPort + "/"); }
 
+    // Opens the compact panel in its own small window (Edge "app" window: no tabs or address bar).
+    // Falls back to the default browser if Edge isn't found.
+    void OpenMini(string layout)
+    {
+        string url = "http://localhost:" + Settings.HttpPort + "/?mini=" + layout;
+        string size = layout == "bar" ? "1000,130" : "300,440";
+        try { Process.Start("msedge", "--app=" + url + " --window-size=" + size); }
+        catch { Program.OpenBrowser(url); }
+    }
+
     void ShowAddress()
     {
         List<string> u = Program.LanUrls();
@@ -887,7 +1062,7 @@ class TrayContext : ApplicationContext
             ? "This computer doesn't seem to be on a network right now."
             : "On the phone or tablet, connect to the same Wi-Fi as this computer, open the web browser and type:\n\n    " +
               string.Join("\n    ", u.ToArray()) + "\n\nTip: add it to the home screen so it works like an app.\n\nCopy the address to the clipboard?";
-        if (MessageBox.Show(msg, Program.AppName, u.Count == 0 ? MessageBoxButtons.OK : MessageBoxButtons.YesNo,
+        if (MessageBox.Show(msg, Program.DisplayName, u.Count == 0 ? MessageBoxButtons.OK : MessageBoxButtons.YesNo,
                 MessageBoxIcon.Information) == DialogResult.Yes)
         {
             try { Clipboard.SetText(u[0]); } catch { }
@@ -896,8 +1071,8 @@ class TrayContext : ApplicationContext
 
     void ExitApp()
     {
-        if (MessageBox.Show("Stop SPE Control?\n\nPhones, tablets and this computer will no longer be able to control the amplifier until it is started again.",
-                Program.AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show("Stop Expert Amp Control?\n\nPhones, tablets and this computer will no longer be able to control the amplifier until it is started again.",
+                Program.DisplayName, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         icon.Visible = false;
         icon.Dispose();
         timer.Stop();

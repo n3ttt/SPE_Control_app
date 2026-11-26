@@ -1,19 +1,33 @@
-# SPE Control
+# Expert Amp Control
 
-A friendlier control panel for the SPE Expert 1.5K-FA linear amplifier, usable from any computer, phone or tablet on the home network.
+A friendlier control panel for SPE Expert linear amplifiers (1.5K-FA, 2K-FA), usable from any computer, phone or tablet on the home network.
 
 It shows gauges, explains warnings in plain English, lets you select bands and power levels with one click, and keeps a 2-minute history graph and an event log.
 
 ## Installing (Windows)
 
-1. Run **SPEControl-Setup.exe**.
+1. Download **SPEControl-Setup.exe** from the [latest release](https://github.com/n3ttt/SPE_Control_app/releases/latest).
+2. Open the downloaded file.
    Windows may show "Windows protected your PC" because the app isn't code-signed. Click **More info**, then **Run anyway**.
-2. Click through the installer. It starts the app at the end.
-3. Plug the amplifier in by USB. The app finds it automatically.
+3. Click through the installer. It starts the app at the end.
+4. Plug the amplifier in by USB. The app finds it automatically.
+
+The app checks GitHub for a new release when it starts and once a day after that. When one is out, a notice pops up from the tray icon and the panel shows **Update available**. Click either one to download it. Right-click the tray icon to **Check for updates** now, or to tick **Include beta versions in updates**.
+
+To update, run the new installer over the old one. You don't need to uninstall first, and your settings are kept. To remove the app, use **Settings ▸ Apps ▸ Installed apps ▸ Expert Amp Control ▸ Uninstall**.
 
 A gauge icon appears by the clock in the taskbar's notification area.
 - **Double-click it** to open the panel.
 - **Right-click it** to see the address phones and tablets should use, choose the USB port by hand, or turn "start with Windows" on or off.
+
+## Mini panel
+
+For when the full panel takes too much screen next to the logger. Right-click the tray icon, choose **Open mini panel**, then:
+
+- **Tall strip**: a narrow column to sit beside the logger.
+- **Wide bar**: a short bar to sit above or below it.
+
+Both show Operate/Standby, TX, output with peak, SWR, temperature, band, power level and the current warning. The ⇅ button switches between the two, and ⤢ opens the full panel. It opens in a small Edge window with no address bar. Windows can't keep a browser window always on top, so park it where the logger doesn't cover it. Any browser can open it too: add `?mini=strip` or `?mini=bar` to the panel address.
 
 ## Phones and tablets
 
@@ -23,7 +37,7 @@ The app answers only devices on the local network and VPN addresses such as Tail
 
 ## Amp follows the radio (TTTLog, N1MM+ and others)
 
-SPE Control listens for N1MM-compatible **RadioInfo** packets on UDP port 12060. When the radio moves to another band, the app presses the amp's Band keys until the amp matches.
+Expert Amp Control listens for N1MM-compatible **RadioInfo** packets on UDP port 12060. When the radio moves to another band, the app presses the amp's Band keys until the amp matches.
 
 - It never changes band while the amp or the radio is transmitting.
 - It ignores frequencies outside the ham bands, so tuning to WWV won't move the amp.
@@ -32,7 +46,7 @@ SPE Control listens for N1MM-compatible **RadioInfo** packets on UDP port 12060.
 
 **TTTLog setup:**
 1. Go to **Config ▸ Rotor & N1MM broadcasts**.
-2. Tick **RadioInfo**. The default target, `127.0.0.1:12060`, is right when TTTLog runs on the same PC as SPE Control.
+2. Tick **RadioInfo**. The default target, `127.0.0.1:12060`, is right when TTTLog runs on the same PC as Expert Amp Control.
 3. If TTTLog runs on a different PC, add that PC's address, for example `127.0.0.1:12060 192.168.1.188:12060`.
 
 To test without a radio, run `.\tools\send-radioinfo.ps1 -kHz 7025`.
