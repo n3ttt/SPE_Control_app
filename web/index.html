@@ -141,6 +141,7 @@
   #mini .m-tx.tx{border-color:var(--tx);background:rgba(255,90,79,.16);color:var(--tx)}
   #mini .m-pwr{grid-area:pwr}
   #mini .m-pwr .m-v{font-size:24px;font-weight:700}
+  #mini .m-pk b{color:var(--text);font-weight:600}
   .pk{position:relative}
   .pk > b{position:absolute;top:-4px;width:2px;height:20px;background:var(--text);left:0;opacity:0;transition:left .2s}
   #mini .pk > b{height:15px}
@@ -176,6 +177,7 @@
   #mini.bar .m-head .name,#mini.bar .m-head .sp,#mini.bar .m-head .dot,#mini.bar .m-foot,#mini.bar .m-alert span{display:none}
   #mini.bar .m-head .m-icon{width:32px;flex:1}
   #mini.bar .m-pwr .m-v{font-size:20px}
+  #mini.bar .m-pwr > .m-row > .m-k:first-child{display:none}
   #mini.bar .m-lvl{grid-template-rows:repeat(3,minmax(0,1fr))}
   #mini.bar .m-lvl button{min-height:0;font-size:11px}
   #mini.bar .m-band .m-v{font-size:18px}
@@ -193,7 +195,7 @@
   <button class="m-op standby" id="mOp" title="Toggle Operate / Standby  (O)">STANDBY</button>
   <div class="m-tx" id="mTx">TX</div>
   <div class="m-card m-pwr">
-    <div class="m-row"><span class="m-k">Output</span><span class="sp"></span><span class="m-v" id="mPwr">0</span><span class="m-k">W</span></div>
+    <div class="m-row"><span class="m-k">Output</span><span class="sp"></span><span class="m-k m-pk" title="Peak output, 3 s hold">Peak <b id="mPwrPk">0</b></span><span class="sp"></span><span class="m-v" id="mPwr">0</span><span class="m-k">W</span></div>
     <div class="pk"><div class="bar"><i id="mPwrBar"></i></div><b id="mPeakTick"></b></div>
   </div>
   <div class="m-card m-swr"><div class="m-row"><span class="m-k" title="Highest SWR, held for 10 seconds">SWR peak</span><span class="sp"></span><span class="m-v" id="mSwr">—</span></div><div class="pk"><div class="bar"><i id="mSwrBar"></i></div><b id="mSwrTick"></b></div></div>
@@ -708,6 +710,7 @@ function renderMini(s,max,t){
   setBar("mPwrBar",s.pout/max*100, s.pout>max*0.97?"var(--bad)":"var(--accent)");
   $("mPeakTick").style.left=Math.min(100,peak/max*100)+"%";
   $("mPeakTick").style.opacity=peak>0?.85:0;
+  $("mPwrPk").textContent=peak;
   const pk=swrPk.ant.v;
   if(pk>0){ $("mSwr").textContent=pk.toFixed(2); $("mSwr").style.color=swrColor(pk); $("mSwrTick").style.left=Math.max(0,Math.min(100,swrPct(pk)))+"%"; $("mSwrTick").style.opacity=.85; }
   else { $("mSwr").textContent="—"; $("mSwr").style.color=""; $("mSwrTick").style.opacity=0; }
@@ -784,7 +787,7 @@ document.querySelectorAll("#mLvl button").forEach(b=>b.onclick=()=>{ if(st && st
 $("mLayout").onclick=()=>{
   setMiniLayout(MINI==="bar"?"strip":"bar");
   // Works in the app window the tray opens; ordinary browser tabs ignore it.
-  try{ MINI==="bar" ? window.resizeTo(960,130) : window.resizeTo(300,440); }catch(e){}
+  try{ MINI==="bar" ? window.resizeTo(1000,130) : window.resizeTo(300,440); }catch(e){}
   render();
 };
 $("mFull").onclick=()=>{ const u=new URL(location.href); u.searchParams.delete("mini"); window.open(u.toString(),"_blank"); };

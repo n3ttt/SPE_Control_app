@@ -891,7 +891,7 @@ class TrayContext : ApplicationContext
     void OpenMini(string layout)
     {
         string url = "http://localhost:" + Settings.HttpPort + "/?mini=" + layout;
-        string size = layout == "bar" ? "960,130" : "300,440";
+        string size = layout == "bar" ? "1000,130" : "300,440";
         try { Process.Start("msedge", "--app=" + url + " --window-size=" + size); }
         catch { Program.OpenBrowser(url); }
     }
